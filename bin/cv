@@ -1,3 +1,11 @@
 #!/usr/bin/env bash
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-exec node "$SCRIPT_DIR/../dist/main.js" "$@"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ -f "$PROJECT_DIR/.env" ]; then
+  set -a
+  source "$PROJECT_DIR/.env"
+  set +a
+fi
+
+exec node "$PROJECT_DIR/dist/main.js" "$@"
