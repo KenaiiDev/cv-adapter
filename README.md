@@ -49,9 +49,15 @@ node dist/main.js generate "Senior Python Developer at Mercado Libre"
 ### As global CLI command (after linking)
 
 ```bash
-npm link
+pnpm link --global
 cv init --pdf ~/cv/CV.pdf --lang es
 cv generate "Senior Python Developer at Mercado Libre"
+```
+
+Or use npx (no linking needed):
+
+```bash
+npx cv init --pdf ~/cv/CV.pdf --lang es
 ```
 
 ### Initialize profile from your CV PDF
