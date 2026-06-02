@@ -142,7 +142,8 @@ Inglés (Intermedio)
       const profile = parser.toProfile(sampleCVText, 'Unknown');
 
       expect(Array.isArray(profile.skills)).toBe(true);
-      expect(profile.skills[0]).toBe('React');
+      expect(profile.skills[0]).toHaveProperty('category');
+      expect(profile.skills[0]).toHaveProperty('items');
     });
 
     it('should parse languages section', () => {

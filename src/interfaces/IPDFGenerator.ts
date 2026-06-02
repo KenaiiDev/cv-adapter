@@ -1,3 +1,6 @@
+import type { CVData } from '../domain/entities/CVData.js';
+import type { Language } from './IAIProvider.js';
+
 export interface IPDFGenerator {
-  generate(html: string, outputPath: string): Promise<void>;
+  generate(cvData: CVData, language: Language): Promise<Buffer>;
 }

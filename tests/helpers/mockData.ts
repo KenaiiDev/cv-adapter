@@ -1,5 +1,5 @@
 import type { Profile } from '../../src/domain/entities/Profile.ts';
-import type { CVData } from '../../src/domain/entities/CVData.ts';
+import type { CVData, SkillCategory } from '../../src/domain/entities/CVData.ts';
 
 export function createMockProfile(overrides: Partial<Profile> = {}): Profile {
   return {
@@ -36,7 +36,10 @@ export function createMockProfile(overrides: Partial<Profile> = {}): Profile {
         description: 'Bachelor degree',
       },
     ],
-    skills: ['TypeScript', 'React', 'Node.js', 'Python', 'PostgreSQL'],
+    skills: [
+      { category: 'Languages', items: ['TypeScript', 'Python'] },
+      { category: 'Frameworks', items: ['React', 'Node.js'] },
+    ],
     languages: [
       { language: 'Spanish', level: 'Native' },
       { language: 'English', level: 'B2' },
@@ -74,7 +77,11 @@ export function createMockCVData(overrides: Partial<CVData> = {}): CVData {
         description: 'Bachelor degree',
       },
     ],
-    skills: ['TypeScript', 'React', 'Node.js', 'Python', 'PostgreSQL'],
+    skills: [
+      { category: 'Languages', items: ['TypeScript', 'Python'] },
+      { category: 'Frameworks', items: ['React', 'Node.js'] },
+      { category: 'Databases', items: ['PostgreSQL'] },
+    ],
     languages: [
       { language: 'Spanish', level: 'Native' },
       { language: 'English', level: 'B2' },

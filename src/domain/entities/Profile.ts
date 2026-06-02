@@ -21,13 +21,16 @@ export interface Education {
   description?: string;
 }
 
+import type { SkillCategory } from './CVData.js';
+export type { SkillCategory } from './CVData.js';
+
 export interface Profile {
   name: string;
   contact: Contact;
   summary?: string;
   experience: Experience[];
   education: Education[];
-  skills: string[];
+  skills: SkillCategory[];
   languages: { language: string; level: string }[];
   updated_at: string;
 }

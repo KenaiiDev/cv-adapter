@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import type { Profile, Experience, Education } from '../../domain/entities/Profile.js';
+import type { Profile, Experience, Education, SkillCategory } from '../../domain/entities/Profile.js';
 import type { IParser } from '../../interfaces/IParser.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 
@@ -179,12 +179,7 @@ export class PDFParser implements IParser {
       const cities = ['Buenos Aires', 'Argentina', 'Madrid', 'Barcelona', 'Mexico', 'Colombia', 'Chile', 'Brasil', 'Peru', 'Lima', 'Montevideo', 'Santiago'];
       for (const city of cities) {
         if (line.includes(city)) {
-          const locationMatch = line.match(new RegExp(`[^,]*${city}[^,]*`));
-          if (locationMatch) {
-            profile.contact.location = locationMatch[0].trim();
-          } else {
-            profile.contact.location = city;
-          }
+          profile.contact.location = line.trim();
           break;
         }
       }
@@ -246,6 +241,20 @@ export class PDFParser implements IParser {
     const companyKeywordsEn = ['Freelance', 'Google', 'Microsoft', 'Amazon', 'Meta', 'Netflix', 'Spotify', 'Stripe'];
 
     const findDateInfo = (line: string): { dateStart: string; dateEnd: string; dateLineIdx: number; dateLineLen: number } | null => {
+      const fullYearMatch = line.match(/^\s*(\d{4})\s*[-–]\s*(\d{4}|Actual|Now|Present)\s*$/i);
+      if (fullYearMatch) {
+        let endDate = fullYearMatch[2];
+        if (/^(Actual|Now|Present)$/i.test(endDate)) {
+          endDate = 'Actual';
+        }
+        return {
+          dateStart: fullYearMatch[1],
+          dateEnd: endDate,
+          dateLineIdx: 0,
+          dateLineLen: line.length
+        };
+      }
+
       let earliestMonthIndex = -1;
       let earliestMonth = '';
       let earliestAfterMonth = '';
@@ -476,8 +485,8 @@ export class PDFParser implements IParser {
     return cleaned;
   }
 
-  private parseSkillsSection(lines: string[], startIdx: number, endIdx: number): { skills: string[]; languages: Array<{ language: string; level: string }> } {
-    const skills: string[] = [];
+  private parseSkillsSection(lines: string[], startIdx: number, endIdx: number): { skills: SkillCategory[]; languages: Array<{ language: string; level: string }> } {
+    const skillsMap: Map<string, string[]> = new Map();
     const languages: Array<{ language: string; level: string }> = [];
 
     const languageKeywordsEs = ['Inglés', 'Español', 'Portugués', 'Francés', 'Alemán', 'Italiano'];
@@ -503,10 +512,11 @@ export class PDFParser implements IParser {
           if (langResult) {
             languages.push(langResult);
           }
+        } else {
+          const parsedSkills = this.parseSkillsList(valuePart);
+          const existing = skillsMap.get(category) || [];
+          skillsMap.set(category, [...existing, ...parsedSkills]);
         }
-
-        const parsedSkills = this.parseSkillsList(valuePart);
-        skills.push(...parsedSkills);
         continue;
       }
 
@@ -518,8 +528,11 @@ export class PDFParser implements IParser {
           const langResult = this.detectLanguageInText(skill, languageKeywordsEs, languageKeywordsEn);
           if (langResult && !languages.some(l => l.language === langResult.language)) {
             languages.push(langResult);
-          } else if (!skills.includes(skill)) {
-            skills.push(skill);
+          } else {
+            const existing = skillsMap.get('General') || [];
+            if (!existing.includes(skill)) {
+              skillsMap.set('General', [...existing, skill]);
+            }
           }
         }
         continue;
@@ -532,14 +545,18 @@ export class PDFParser implements IParser {
           languages.push(langResult);
         } else if (!skill.includes(':') && !skill.match(/^\d{4}/)) {
           const cleanedSkill = skill.replace(/[.,;:]\s*$/, '').trim();
-          if (cleanedSkill && !skills.includes(cleanedSkill)) {
-            skills.push(cleanedSkill);
+          if (cleanedSkill) {
+            const existing = skillsMap.get('General') || [];
+            if (!existing.includes(cleanedSkill)) {
+              skillsMap.set('General', [...existing, cleanedSkill]);
+            }
           }
         }
       }
     }
 
-    return { skills: [...new Set(skills)], languages };
+    const skills: SkillCategory[] = Array.from(skillsMap.entries()).map(([category, items]) => ({ category, items }));
+    return { skills, languages };
   }
 
   private parseLanguageFromLine(line: string, langKeywordsEs: string[], langKeywordsEn: string[]): { language: string; level: string } | null {

@@ -1,16 +1,14 @@
 import * as dotenv from 'dotenv';
 import * as readline from 'readline';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { IProfileRepository } from '../../interfaces/IProfileRepository.js';
-import type { IRenderer } from '../../interfaces/IRenderer.js';
 import type { IAIProvider, Language } from '../../interfaces/IAIProvider.js';
-import type { Logger } from '../../interfaces/Logger.js';
-import type { PreviewServerFactory } from '../../interfaces/PreviewServerFactory.js';
 import { defaultLogger } from '../../interfaces/Logger.js';
 import { GenerateCV } from '../services/GenerateCV.js';
-import { RenderCV } from '../services/RenderCV.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 import { JSONProfileRepository } from '../../infrastructure/repositories/JSONProfileRepository.js';
-import { EJSRenderer } from '../../infrastructure/renderer/EJSRenderer.js';
+import { PDFGenerator } from '../../infrastructure/pdf/PDFGenerator.js';
 import { GroqAI } from '../../infrastructure/ai/GroqAI.js';
 import { GeminiAI } from '../../infrastructure/ai/GeminiAI.js';
 import { OpenAIProvider } from '../../infrastructure/ai/OpenAI.js';
@@ -22,22 +20,13 @@ dotenv.config();
 export class GenerateCommand {
   private repository: IProfileRepository;
   private aiProviderFactory: () => IAIProvider;
-  private renderer: IRenderer;
-  private previewServerFactory: PreviewServerFactory;
-  private logger: Logger;
 
   constructor(
     repository: IProfileRepository,
-    aiProviderFactory: () => IAIProvider,
-    renderer: IRenderer,
-    previewServerFactory: PreviewServerFactory,
-    logger: Logger = defaultLogger
+    aiProviderFactory: () => IAIProvider
   ) {
     this.repository = repository;
     this.aiProviderFactory = aiProviderFactory;
-    this.renderer = renderer;
-    this.previewServerFactory = previewServerFactory;
-    this.logger = logger;
   }
 
   async execute(vacancy: string, language?: Language): Promise<void> {
@@ -55,22 +44,29 @@ export class GenerateCommand {
       const aiProvider = this.aiProviderFactory();
       const generateCV = new GenerateCV(aiProvider);
 
-      this.logger.log(`\n🎯 Vacancy: ${vacancy.substring(0, 80)}...`);
-      this.logger.log(`🌐 Language: ${lang === 'es' ? 'Español' : 'English'}`);
+      defaultLogger.log(`\n🎯 Vacancy: ${vacancy.substring(0, 80)}...`);
+      defaultLogger.log(`🌐 Language: ${lang === 'es' ? 'Español' : 'English'}`);
 
+      defaultLogger.log('\n📝 Generating CV...');
       const cvData = await generateCV.execute(profile, vacancy, lang);
 
-      const renderCV = new RenderCV(this.renderer);
-      const html = await renderCV.toHTML(cvData);
+      defaultLogger.log('✅ CV generated successfully');
 
-      this.logger.log('\n📝 Opening preview in browser...');
-      const server = this.previewServerFactory.create(html);
-      await server.start();
+      const filename = await this.askFilename();
+
+      defaultLogger.log('📄 Generating PDF...');
+      const pdfGenerator = new PDFGenerator();
+      const buffer = await pdfGenerator.generate(cvData, lang);
+
+      const outputPath = path.resolve(process.cwd(), `${filename}.pdf`);
+      await fs.promises.writeFile(outputPath, buffer);
+
+      defaultLogger.log(`✅ PDF saved to: ${outputPath}`);
     } catch (error) {
       if (error instanceof DomainError) {
-        this.logger.error(error.toString());
+        defaultLogger.error(error.toString());
       } else {
-        this.logger.error('❌ Unexpected error:', error);
+        defaultLogger.error('❌ Unexpected error:', error);
       }
       process.exit(1);
     }
@@ -87,6 +83,25 @@ export class GenerateCommand {
         rl.close();
         const lang = answer.trim().toLowerCase() === 'en' ? 'en' : 'es';
         resolve(lang);
+      });
+    });
+  }
+
+  private askFilename(): Promise<string> {
+    return new Promise((resolve) => {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      rl.question('\n📁 Enter filename for PDF (without extension): ', (answer: string) => {
+        rl.close();
+        const filename = answer.trim().replace(/\.pdf$/i, '');
+        if (!filename) {
+          resolve('CV-generado');
+        } else {
+          resolve(filename);
+        }
       });
     });
   }
@@ -117,71 +132,10 @@ export function createAIProviderFactory(): () => IAIProvider {
   };
 }
 
-export function createPreviewServerFactory(): PreviewServerFactory {
-  return {
-    create(html: string) {
-      return {
-        async start() {
-          const expressModule = await import('express');
-          const express = expressModule.default;
-          const app = express();
-
-          app.use(express.static('.'));
-
-          app.get('/', (_req: any, res: any) => {
-            res.send(html);
-          });
-
-          app.get('/download', async (_req: any, res: any) => {
-            try {
-              const htmlPdfModule = await import('html-pdf-node');
-              const file = { content: html };
-
-              const options = {
-                format: 'A4' as const,
-                printBackground: true,
-                margin: { top: '20px', bottom: '20px', left: '20px', right: '20px' },
-              };
-
-              const buffer = await htmlPdfModule.fileToPdf(file, options);
-              res.setHeader('Content-Type', 'application/pdf');
-              res.setHeader('Content-Disposition', 'attachment; filename="CV-generado.pdf"');
-              res.send(buffer);
-            } catch (error) {
-              res.status(500).send('Error generating PDF');
-            }
-          });
-
-          const PORT = 8080;
-          const server = app.listen(PORT, async () => {
-            console.log(`   Preview: http://localhost:${PORT}`);
-            console.log(`   Click "Descargar PDF" button to save`);
-            console.log(`   Press Ctrl+C to stop server`);
-
-            const openModule = await import('open');
-            const open = openModule.default;
-            await open(`http://localhost:${PORT}`);
-          });
-
-          process.on('SIGINT', () => {
-            server.close(() => process.exit(0));
-          });
-        },
-        stop() {
-          process.exit(0);
-        }
-      };
-    }
-  };
-}
-
 export function createGenerateCommand(): GenerateCommand {
   return new GenerateCommand(
     new JSONProfileRepository(),
-    createAIProviderFactory(),
-    new EJSRenderer(),
-    createPreviewServerFactory(),
-    defaultLogger
+    createAIProviderFactory()
   );
 }
 

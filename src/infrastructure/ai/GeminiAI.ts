@@ -1,8 +1,8 @@
-import type { Profile } from '../../domain/entities/Profile.js';
-import type { CVData } from '../../domain/entities/CVData.js';
-import type { Language } from '../../interfaces/IAIProvider.js';
-import { BaseAIProvider } from './base.js';
-import { DomainError } from '../../domain/errors/DomainError.js';
+import type { Profile } from "../../domain/entities/Profile.js";
+import type { CVData } from "../../domain/entities/CVData.js";
+import type { Language } from "../../interfaces/IAIProvider.js";
+import { BaseAIProvider } from "./base.js";
+import { DomainError } from "../../domain/errors/DomainError.js";
 
 interface GeminiResponse {
   candidates?: Array<{
@@ -14,31 +14,35 @@ interface GeminiResponse {
 
 export class GeminiAI extends BaseAIProvider {
   getProviderName(): string {
-    return 'gemini';
+    return "gemini";
   }
 
   getModel(): string {
-    return 'gemini-1.5-flash';
+    return "gemini-2.5-flash";
   }
 
   getEndpoint(): string {
-    return 'https://generativelanguage.googleapis.com/v1';
+    return "https://generativelanguage.googleapis.com/v1beta";
   }
 
   protected getAPIKey(): string {
     const key = process.env.AI_API_KEY;
     if (!key) {
       throw new DomainError(
-        'Gemini API key not configured',
-        'AI_ERROR',
-        'Set AI_API_KEY in your .env file'
+        "Gemini API key not configured",
+        "AI_ERROR",
+        "Set AI_API_KEY in your .env file",
       );
     }
     return key;
   }
 
-  protected buildPrompt(profile: Profile, vacancy: string, language: Language): string {
-    const langLabel = language === 'es' ? 'español' : 'english';
+  protected buildPrompt(
+    profile: Profile,
+    vacancy: string,
+    language: Language,
+  ): string {
+    const langLabel = language === "es" ? "español" : "english";
     const profileJSON = JSON.stringify(profile, null, 2);
 
     return `You are an expert CV writer specializing in Harvard-style resumes.
@@ -67,7 +71,10 @@ Output format (JSON only):
   "summary": "Professional summary tailored to the vacancy",
   "experience": [{ "title": "...", "company": "...", "start_date": "...", "end_date": "...", "description": "..." }],
   "education": [{ "degree": "...", "institution": "...", "year": "...", "description": "..." }],
-  "skills": ["...", "..."],
+  "skills": [
+    { "category": "Lenguajes", "items": ["JavaScript", "TypeScript"] },
+    { "category": "Frameworks", "items": ["React", "Node.js"] }
+  ],
   "languages": [{ "language": "...", "level": "..." }]
 }`;
   }
@@ -76,14 +83,14 @@ Output format (JSON only):
     const url = `${this.getEndpoint()}/models/${this.getModel()}:generateContent?key=${this.getAPIKey()}`;
 
     const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 4096,
-          responseMimeType: 'application/json'
+          responseMimeType: "application/json",
         },
       }),
     });
@@ -92,13 +99,13 @@ Output format (JSON only):
       const error = await response.text();
       throw new DomainError(
         `Gemini API error: ${response.status} - ${error}`,
-        'AI_ERROR',
-        'Check your AI_API_KEY and try again'
+        "AI_ERROR",
+        "Check your AI_API_KEY and try again",
       );
     }
 
     const data = (await response.json()) as GeminiResponse;
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   }
 
   protected parseResponse(content: string): Partial<CVData> {
@@ -106,9 +113,9 @@ Output format (JSON only):
       return JSON.parse(content.trim());
     } catch {
       throw new DomainError(
-        'Failed to parse Gemini response as JSON',
-        'AI_ERROR',
-        'The AI returned an invalid format. Try regenerating.'
+        "Failed to parse Gemini response as JSON",
+        "AI_ERROR",
+        "The AI returned an invalid format. Try regenerating.",
       );
     }
   }

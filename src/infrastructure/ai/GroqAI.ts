@@ -62,7 +62,10 @@ Output format (JSON only):
   "summary": "Professional summary tailored to the vacancy",
   "experience": [{ "title": "...", "company": "...", "start_date": "...", "end_date": "...", "description": "..." }],
   "education": [{ "degree": "...", "institution": "...", "year": "...", "description": "..." }],
-  "skills": ["...", "..."],
+  "skills": [
+    { "category": "Lenguajes", "items": ["JavaScript", "TypeScript"] },
+    { "category": "Frameworks", "items": ["React", "Node.js"] }
+  ],
   "languages": [{ "language": "...", "level": "..." }]
 }`;
   }

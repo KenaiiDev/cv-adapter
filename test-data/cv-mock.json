@@ -1,0 +1,40 @@
+{
+  "name": "Juan Pérez",
+  "contact": {
+    "email": "juan.perez@email.com",
+    "phone": "+54 11 5555-1234",
+    "location": "Buenos Aires, Argentina",
+    "linkedin": "linkedin.com/in/juanperez",
+    "github": "github.com/juanperez"
+  },
+  "summary": "Desarrollador Full Stack con más de 5 años de experiencia en tecnologías JavaScript y TypeScript. Especializado en arquitecturas web escalables y metodologías ágiles.",
+  "experience": [
+    {
+      "title": "Senior Full Stack Developer",
+      "company": "TechCorp Argentina",
+      "start_date": "2021",
+      "end_date": "Presente",
+      "description": "Desarrollo de aplicaciones web escalables usando [React] y [Node.js]. Implementación de APIs RESTful y arquitecturas de microservicios. Liderazgo técnico de equipo de 4 desarrolladores."
+    },
+    {
+      "title": "Full Stack Developer",
+      "company": "Startup XYZ",
+      "start_date": "2019",
+      "end_date": "2021",
+      "description": "Desarrollo de plataforma e-commerce con [React], [TypeScript] y [PostgreSQL]. Optimización de rendimiento alcanzando 40% de mejora en tiempos de carga."
+    }
+  ],
+  "education": [
+    {
+      "degree": "Ingeniería en Sistemas",
+      "institution": "Universidad de Buenos Aires",
+      "year": "2018"
+    }
+  ],
+  "skills": "Lenguajes: JavaScript - TypeScript - Python\nFrameworks: React - Node.js - Express\nDatabases: PostgreSQL - MongoDB\nTools: Docker - Git - AWS",
+  "languages": [
+    { "language": "Español", "level": "Nativo" },
+    { "language": "Inglés", "level": "B2" }
+  ],
+  "generated_at": "2024-01-15T10:00:00.000Z"
+}
