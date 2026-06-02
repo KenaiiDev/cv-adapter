@@ -3,7 +3,11 @@ import type { Profile, Experience, Education } from '../../domain/entities/Profi
 import type { IParser } from '../../interfaces/IParser.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 
+type Locale = 'es' | 'en';
+
 export class PDFParser implements IParser {
+  private locale: Locale = 'es';
+
   async parse(filePath: string): Promise<string> {
     try {
       const pdfParse = (await import('pdf-parse')).default;
@@ -20,6 +24,13 @@ export class PDFParser implements IParser {
   }
 
   toProfile(text: string, name: string): Profile {
+    const isEnglish = text.toLowerCase().includes('professional profile') ||
+                      text.toLowerCase().includes('experience') ||
+                      text.toLowerCase().includes('education') ||
+                      text.toLowerCase().includes('skills');
+
+    this.locale = isEnglish ? 'en' : 'es';
+
     const profile: Profile = {
       name: name,
       contact: { email: '', phone: '', location: '' },
@@ -33,212 +44,582 @@ export class PDFParser implements IParser {
 
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
+    const sections: Array<{ type: string; startIdx: number; endIdx: number }> = [];
+
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const upper = line.toUpperCase();
-
-      const emailMatch = line.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-      if (emailMatch && !profile.contact.email) {
-        profile.contact.email = emailMatch[0];
+      const sectionData = this.parseSectionHeader(lines[i]);
+      if (sectionData) {
+        const endIdx = this.findSectionEnd(lines, i + 1, sectionData.type);
+        sections.push({ type: sectionData.type, startIdx: i + 1, endIdx });
       }
+    }
 
-      const linkedinMatch = line.match(/linkedin\.com\/in\/[a-zA-Z0-9-]+/);
-      if (linkedinMatch && !profile.contact.linkedin) {
-        profile.contact.linkedin = 'https://' + linkedinMatch[0];
+    for (const section of sections) {
+      switch (section.type) {
+        case 'EXPERIENCE':
+          profile.experience = this.parseExperienceSection(lines, section.startIdx, section.endIdx);
+          break;
+        case 'EDUCATION':
+          profile.education = this.parseEducationSection(lines, section.startIdx, section.endIdx);
+          break;
+        case 'SKILLS':
+          const { skills, languages } = this.parseSkillsSection(lines, section.startIdx, section.endIdx);
+          profile.skills = skills;
+          if (languages.length > 0) {
+            profile.languages = this.mergeLanguages(profile.languages, languages);
+          }
+          break;
+        case 'SUMMARY':
+          this.parseSummarySection(lines, section.startIdx, section.endIdx, profile);
+          break;
       }
+    }
 
-      const githubMatch = line.match(/github\.com\/[a-zA-Z0-9-]+/i);
-      if (githubMatch && !profile.contact.github) {
-        profile.contact.github = 'https://' + githubMatch[0];
-      }
-
-      const phoneMatch = line.match(/\+54\s*9?\s*11?\s*[\d\s]{8,}/);
-      if (phoneMatch && !profile.contact.phone) {
-        profile.contact.phone = phoneMatch[0].replace(/\s+/g, ' ').trim();
-      }
-
-      if (!profile.contact.location && (line.includes('Buenos Aires') || line.includes('Argentina') || line.includes('Madrid') || line.includes('Barcelona') || line.includes('Mexico'))) {
-        const locationMatch = line.match(/(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*)+(?:Argentina|España|México|Colombia|Chile|Brasil|Perú)/);
-        if (locationMatch) {
-          profile.contact.location = locationMatch[0];
-        }
-      }
-
-      if (upper.startsWith('EXPERIENCIA PROFESIONAL')) {
-        const expBlock = this.parseExperienceSection(lines, i + 1);
-        profile.experience = expBlock;
-      }
-
-      if (upper.startsWith('EDUCACI')) {
-        const eduBlock = this.parseEducationSection(lines, i + 1);
-        profile.education = eduBlock;
-      }
-
-      if (upper.startsWith('SKILLS ADICIONALES') || upper.startsWith('TECNOLOG')) {
-        const skillsBlock = this.parseSkillsSection(lines, i + 1);
-        profile.skills = skillsBlock;
-      }
-
-      if (line.includes('Desarrollador Fullstack con experiencia')) {
-        profile.summary = line + (lines[i + 1] || '');
-      }
-
-      if (upper.includes('INGL') || upper.includes('ENGLISH')) {
-        const langMatch = line.match(/(?:Inglés|English)[^\w]*([A-Za-z0-9]+)?/);
-        if (langMatch && !profile.languages.some(l => l.language === 'English')) {
-          profile.languages.push({ language: 'English', level: langMatch[2] || 'Intermediate' });
-        }
-      }
+    for (let i = 0; i < lines.length; i++) {
+      this.parseContactInfo(lines[i], profile);
+      this.parseSummary(lines, i, profile);
     }
 
     profile.name = profile.name || name;
     return profile;
   }
 
-  private parseExperienceSection(lines: string[], startIdx: number): Experience[] {
-    const experiences: Experience[] = [];
-    let current: Partial<Experience> | null = null;
-    let descriptionBuffer = '';
+  private parseSectionHeader(line: string): { type: string; endIdx: number } | null {
+    const upper = line.toUpperCase();
+    const trimmed = line.trim();
 
-    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-                        'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December',
-                        'Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (trimmed.length > 50) return null;
 
-    const isMonthDateLine = (line: string): boolean => {
-      const upper = line.toUpperCase();
-      return monthNames.some(m => {
-        const monthUpper = m.toUpperCase();
-        return upper.startsWith(monthUpper + ' ') || upper.startsWith(m + ' ');
-      }) && (line.includes(' - ') || line.includes(' – ') || line.includes('-'));
-    };
+    if (/^EXPERIENC(I?A)?\s*(PROFESIONAL|PROFESSIONAL)?$/.test(upper) || /^WORK\s*EXPERIENCE$/.test(upper)) {
+      return { type: 'EXPERIENCE', endIdx: 0 };
+    }
+    if (/^EDUCACI[OÓ]N$/.test(upper) || /^ACADEMI[CS]$/.test(upper)) {
+      return { type: 'EDUCATION', endIdx: 0 };
+    }
+    if (/^SKILLS?\s*(T[ÉE]CNICOS?|TÉCNICAS?|TECHNICAL)?$/.test(upper) || upper.includes('SKILLS')) {
+      return { type: 'SKILLS', endIdx: 0 };
+    }
+    if (/^PERFIL\s*PROFESIONAL$/.test(upper) || /^SUMMARY$/.test(upper)) {
+      return { type: 'SUMMARY', endIdx: 0 };
+    }
+
+    return null;
+  }
+
+  private parseSection(section: string, lines: string[], startIdx: number, profile: Profile): number {
+    const endIdx = this.findSectionEnd(lines, startIdx + 1, section);
+
+    switch (section) {
+      case 'EXPERIENCE':
+        profile.experience = this.parseExperienceSection(lines, startIdx + 1, endIdx);
+        break;
+      case 'EDUCATION':
+        profile.education = this.parseEducationSection(lines, startIdx + 1, endIdx);
+        break;
+      case 'SKILLS':
+        const { skills, languages } = this.parseSkillsSection(lines, startIdx + 1, endIdx);
+        profile.skills = skills;
+        if (languages.length > 0) {
+          profile.languages = this.mergeLanguages(profile.languages, languages);
+        }
+        break;
+      case 'SUMMARY':
+        this.parseSummarySection(lines, startIdx + 1, endIdx, profile);
+        break;
+    }
+
+    return endIdx;
+  }
+
+  private findSectionEnd(lines: string[], startIdx: number, currentSection: string): number {
+    const sectionKeywords = ['EXPERIENC', 'EDUCACI', 'SKILLS', 'TECNOLOG', 'PERFIL', 'SUMMARY', 'LINKS', 'CONTACT'];
 
     for (let i = startIdx; i < lines.length; i++) {
-      const line = lines[i];
-      const upper = line.toUpperCase();
+      const upper = lines[i].toUpperCase();
+      const trimmed = lines[i].trim();
 
-      if (upper.startsWith('EDUCACI') || upper.startsWith('SKILLS') || upper.startsWith('TECNOLOG')) {
-        break;
+      if (trimmed.length > 50) continue;
+
+      for (const keyword of sectionKeywords) {
+        if (upper.startsWith(keyword)) {
+          return i - 1;
+        }
       }
 
-      if (line.startsWith('Freelance') || line.startsWith('Freelance')) {
-        if (current?.title && current.title !== 'Freelance') {
-          current.description = descriptionBuffer.trim();
-          experiences.push(current as Experience);
-        }
-        if (!current) current = { title: '', company: '', start_date: '', end_date: '', description: '' };
-        current.company = line;
-        descriptionBuffer = '';
-      } else if (line.startsWith('-')) {
-        const desc = line.replace(/^-\s*/, '').trim();
-        if (desc) descriptionBuffer += desc + ' ';
-      } else if (isMonthDateLine(line)) {
-        if (current && (current.title || current.company) && descriptionBuffer.trim()) {
-          current.description = descriptionBuffer.trim();
-          experiences.push(current as Experience);
-          current = null;
-          descriptionBuffer = '';
-        }
-        const parts = line.split(/\s*[-–]\s*/);
-        if (parts.length >= 1 && parts[0].trim()) {
-          if (!current || (!current.title && !current.company)) {
-            current = { title: '', company: '', start_date: '', end_date: '', description: '' };
-          }
-          const dateParts = parts[0].trim().split(/\s+/);
-          if (dateParts.length >= 2) {
-            if (monthNames.some(m => m === dateParts[0] || m.toUpperCase() === dateParts[0].toUpperCase())) {
-              current.start_date = parts[0].trim();
-            } else if (dateParts[0].match(/^\d{4}$/)) {
-              current.start_date = parts[0].trim();
-            }
-          }
-          if (parts[1]) current.end_date = parts[1].trim();
-        }
-      } else if (line.startsWith('Desarrollador') || line.startsWith('Developer') || line.startsWith('Ingenier') || line.startsWith('Senior')) {
-        if (!current) current = { title: '', company: '', start_date: '', end_date: '', description: '' };
-        if (!current.title) current.title = line;
-      } else if (line.length > 3 && !line.startsWith('http') && !line.includes('@') && !line.match(/^\+54/) && !line.match(/^\d{4}/)) {
-        if (!current) {
-          current = { title: '', company: '', start_date: '', end_date: '', description: '' };
-        }
-        if (!current.title && line.length < 50) {
-          current.title = line;
-        }
+      if (trimmed === '1') {
+        return i - 1;
       }
     }
 
-    if (current?.title || current?.company) {
-      current.description = descriptionBuffer.trim();
-      experiences.push(current as Experience);
+    return lines.length;
+  }
+
+  private parseContactInfo(line: string, profile: Profile): void {
+    const emailMatch = line.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch && !profile.contact.email) {
+      profile.contact.email = emailMatch[0];
+    }
+
+    const linkedinMatch = line.match(/linkedin\.com\/in\/[a-zA-Z0-9-]+/);
+    if (linkedinMatch && !profile.contact.linkedin) {
+      profile.contact.linkedin = 'https://' + linkedinMatch[0];
+    }
+
+    const githubMatch = line.match(/github\.com\/[a-zA-Z0-9-]+/i);
+    if (githubMatch && !profile.contact.github) {
+      profile.contact.github = 'https://' + githubMatch[0];
+    }
+
+    const phoneMatch = line.match(/\+54\s*9?\s*11?\s*[\d\s]{8,}/);
+    if (phoneMatch && !profile.contact.phone) {
+      profile.contact.phone = phoneMatch[0].replace(/\s+/g, ' ').trim();
+    }
+
+    if (!profile.contact.location) {
+      const cities = ['Buenos Aires', 'Argentina', 'Madrid', 'Barcelona', 'Mexico', 'Colombia', 'Chile', 'Brasil', 'Peru', 'Lima', 'Montevideo', 'Santiago'];
+      for (const city of cities) {
+        if (line.includes(city)) {
+          const locationMatch = line.match(new RegExp(`[^,]*${city}[^,]*`));
+          if (locationMatch) {
+            profile.contact.location = locationMatch[0].trim();
+          } else {
+            profile.contact.location = city;
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  private parseSummary(lines: string[], idx: number, profile: Profile): void {
+    const line = lines[idx];
+    const upper = line.toUpperCase();
+
+    if (upper.includes('DESARROLLADOR') || upper.includes('DEVELOPER') || upper.includes('FULLSTACK')) {
+      if (!profile.summary) {
+        profile.summary = line;
+        for (let j = idx + 1; j < lines.length; j++) {
+          const nextLine = lines[j];
+          if (nextLine.toUpperCase().startsWith('EXPERIENC') || nextLine.toUpperCase().startsWith('EDUCACI') || nextLine.toUpperCase().startsWith('SKILLS')) {
+            break;
+          }
+          if (nextLine.length > 10 && !nextLine.startsWith('http') && !nextLine.includes('@')) {
+            profile.summary += ' ' + nextLine;
+          } else if (nextLine.length <= 10 && j < lines.length - 1) {
+            profile.summary += ' ' + nextLine;
+          }
+        }
+      }
+    }
+  }
+
+  private parseSummarySection(lines: string[], startIdx: number, endIdx: number, profile: Profile): void {
+    const summaryLines: string[] = [];
+
+    for (let i = startIdx; i <= endIdx && i < lines.length; i++) {
+      const line = lines[i];
+      const upper = line.toUpperCase();
+
+      if (upper.startsWith('EXPERIENC') || upper.startsWith('EDUCACI') || upper.startsWith('SKILLS')) {
+        break;
+      }
+
+      if (line.length > 20 && !line.startsWith('http') && !line.match(/^[A-Z]{3,}\s/)) {
+        summaryLines.push(line);
+      }
+    }
+
+    if (summaryLines.length > 0) {
+      profile.summary = summaryLines.join(' ').replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  private parseExperienceSection(lines: string[], startIdx: number, endIdx: number): Experience[] {
+    const experiences: Experience[] = [];
+
+    const monthNamesEs = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const monthNamesEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const allMonths = [...monthNamesEs, ...monthNamesEn, ...monthNamesShort];
+
+    const companyKeywordsEs = ['Freelance', 'MSA', 'M&M', 'Google', 'Microsoft', 'Amazon', 'Mercado', 'Globant', 'Tiendanube', 'Auth0'];
+    const companyKeywordsEn = ['Freelance', 'Google', 'Microsoft', 'Amazon', 'Meta', 'Netflix', 'Spotify', 'Stripe'];
+
+    const findDateInfo = (line: string): { dateStart: string; dateEnd: string; dateLineIdx: number; dateLineLen: number } | null => {
+      let earliestMonthIndex = -1;
+      let earliestMonth = '';
+      let earliestAfterMonth = '';
+
+      for (const month of allMonths) {
+        const monthIndex = line.indexOf(month);
+        if (monthIndex !== -1 && (earliestMonthIndex === -1 || monthIndex < earliestMonthIndex)) {
+          earliestMonthIndex = monthIndex;
+          earliestMonth = month;
+          earliestAfterMonth = line.substring(monthIndex + month.length);
+        }
+      }
+
+      if (earliestMonthIndex === -1) return null;
+
+      const dateRangeMatch = earliestAfterMonth.match(/^\s*(\d{4})\s*[-–]\s*(.*)$/i);
+      if (dateRangeMatch) {
+        const startYear = dateRangeMatch[1];
+        let endDate = dateRangeMatch[2].trim();
+
+        if (/^(Actual|Now|Present)$/i.test(endDate)) {
+          endDate = 'Actual';
+        } else if (!endDate.match(/\d{4}/)) {
+          endDate = 'Actual';
+        }
+
+        return {
+          dateStart: `${earliestMonth} ${startYear}`,
+          dateEnd: endDate,
+          dateLineIdx: earliestMonthIndex,
+          dateLineLen: earliestMonth.length + dateRangeMatch[0].length
+        };
+      }
+
+      const yearOnlyMatch = earliestAfterMonth.match(/^\s*(\d{4})(?:\s|$)/i);
+      if (yearOnlyMatch) {
+        return {
+          dateStart: `${earliestMonth} ${yearOnlyMatch[1]}`,
+          dateEnd: 'Actual',
+          dateLineIdx: earliestMonthIndex,
+          dateLineLen: earliestMonth.length + yearOnlyMatch[0].length
+        };
+      }
+
+      return null;
+    };
+
+    let currentExp: Partial<Experience> | null = null;
+    let descriptionBuffer = '';
+
+    for (let i = startIdx; i <= endIdx && i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+
+      if (!trimmedLine || trimmedLine === '1') continue;
+
+      const dateInfo = findDateInfo(trimmedLine);
+
+      if (dateInfo) {
+        if (currentExp?.title || currentExp?.company) {
+          currentExp.description = descriptionBuffer.trim();
+          if (currentExp.title || currentExp.company) {
+            experiences.push(currentExp as Experience);
+          }
+        }
+
+        descriptionBuffer = '';
+
+        const beforeDate = trimmedLine.substring(0, dateInfo.dateLineIdx).trim();
+        const afterDate = trimmedLine.substring(dateInfo.dateLineIdx + dateInfo.dateLineLen).trim();
+
+        let company = '';
+        let title = '';
+
+        const isCompanyKeyword = [...companyKeywordsEs, ...companyKeywordsEn].some(k => beforeDate.includes(k));
+        if (isCompanyKeyword || beforeDate.includes('Freelance')) {
+          company = beforeDate.replace(/[-–]\s*$/, '').trim();
+        } else if (beforeDate.length > 0 && beforeDate.length < 40) {
+          company = beforeDate;
+        }
+
+        if (afterDate.length > 0 && afterDate.length < 60) {
+          title = afterDate;
+        }
+
+        currentExp = {
+          title: title,
+          company: company || 'Freelance',
+          start_date: dateInfo.dateStart,
+          end_date: dateInfo.dateEnd,
+          description: '',
+        };
+        continue;
+      }
+
+      if (trimmedLine.startsWith('-')) {
+        const desc = trimmedLine.replace(/^-\s*/, '').replace(/-\s*$/, '').trim();
+        if (desc) {
+          descriptionBuffer += desc + ' ';
+        }
+        continue;
+      }
+
+      if (currentExp && !currentExp.title && trimmedLine.length < 60 && !trimmedLine.includes('@') && !trimmedLine.match(/^\+54/)) {
+        currentExp.title = trimmedLine;
+        continue;
+      }
+
+      if (currentExp && currentExp.title && trimmedLine.length > 20) {
+        descriptionBuffer += trimmedLine + ' ';
+      }
+    }
+
+    if (currentExp?.title || currentExp?.company) {
+      currentExp.description = descriptionBuffer.trim();
+      if (currentExp.title || currentExp.company) {
+        experiences.push(currentExp as Experience);
+      }
     }
 
     return experiences;
   }
 
-  private parseEducationSection(lines: string[], startIdx: number): Education[] {
+  private parseEducationSection(lines: string[], startIdx: number, endIdx: number): Education[] {
     const education: Education[] = [];
     let current: Partial<Education> | null = null;
 
-    for (let i = startIdx; i < lines.length; i++) {
-      const line = lines[i];
-      const upper = line.toUpperCase();
+    const institutionKeywords = ['Universidad', 'University', 'Instituto', 'Global Learning', 'EET', 'School', 'Institute', 'Academy', 'College', 'Colegio'];
+    const degreeKeywords = ['Ingeniería', 'Bachelor', 'Técnico', 'Master', 'Licenciatura', 'Degree', 'Desarrollador', 'Certificate', 'TSU', 'Diploma'];
 
-      if (upper.startsWith('SKILLS') || upper.startsWith('TECNOLOG')) {
-        break;
+    const isYearLine = (line: string): boolean => {
+      return /^\d{4}\s*[-–]\s*\d{4}$/.test(line.trim()) || /^\d{4}\s*[-–]\s*(Actual|Now|Present)$/i.test(line.trim());
+    };
+
+    const hasYear = (line: string): boolean => {
+      return /\d{4}\s*[-–]\s*\d{4}/.test(line) || /\d{4}\s*[-–]\s*(Actual|Now|Present)/i.test(line);
+    };
+
+    for (let i = startIdx; i <= endIdx && i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+
+      if (!trimmedLine || trimmedLine === '1') continue;
+
+      if (isYearLine(trimmedLine)) {
+        const years = trimmedLine.split(/[-–]/).map(s => s.trim());
+        if (current) {
+          current.year = years[0];
+          education.push(current as Education);
+          current = null;
+        }
+        continue;
       }
 
-      if (line.match(/^\d{4}\s*[-–]/)) {
-        if (current?.degree) {
+      const lineHasInstitution = institutionKeywords.some(k => trimmedLine.includes(k));
+      const lineHasDegree = degreeKeywords.some(k => trimmedLine.includes(k));
+      const lineHasYear = hasYear(trimmedLine);
+
+      if (lineHasInstitution && !lineHasYear) {
+        if (current?.degree || current?.institution) {
           education.push(current as Education);
         }
-        current = { degree: '', institution: '', year: '' };
-        const parts = line.split(/[-–]/);
-        if (parts[0]) current.year = parts[0].trim();
-      } else if (line.includes('Universidad') || line.includes('Institute') || line.includes('Instituto') || line.includes('Global Learning') || line.includes('EET') || line.includes('University')) {
-        if (!current) current = { degree: '', institution: '', year: '' };
-        if (!current.institution && (line.includes('Universidad') || line.includes('Global Learning') || line.includes('EET') || line.includes('University'))) {
-          current.institution = line;
-        } else if (!current.degree) {
-          current.degree = line;
-        }
-      } else if (line.match(/\d{4}/) && !current?.year) {
-        const yearMatch = line.match(/\d{4}/);
+
+        const cleanedInstitution = this.cleanEducationValue(trimmedLine);
+        current = { degree: '', institution: cleanedInstitution, year: '' };
+        continue;
+      }
+
+      if (lineHasYear) {
+        const yearMatch = trimmedLine.match(/(\d{4})\s*[-–]\s*(Actual|Now|Present|\d{4})?/);
         if (yearMatch) {
-          if (!current) current = { degree: '', institution: '', year: '' };
-          current.year = yearMatch[0];
+          if (current?.institution && !current?.degree) {
+            const beforeYear = trimmedLine.substring(0, yearMatch.index!).trim();
+            current.degree = beforeYear || current.degree;
+          }
+
+          if (current) {
+            current.year = yearMatch[1];
+          } else {
+            const beforeYear = trimmedLine.substring(0, yearMatch.index!).trim();
+            current = {
+              degree: beforeYear.includes('Ingeniería') || beforeYear.includes('Bachelor') ? beforeYear : '',
+              institution: beforeYear.includes('Universidad') || beforeYear.includes('Institute') ? this.cleanEducationValue(beforeYear) : '',
+              year: yearMatch[1]
+            };
+          }
+
+          if (current.degree || current.institution) {
+            education.push(current as Education);
+            current = null;
+          }
         }
-      } else if (line.includes('Técnico') || line.includes('Ingeniería') || line.includes('Desarrollador') || line.includes('BS') || line.includes('MS') || line.includes('Degree')) {
-        if (!current) current = { degree: '', institution: '', year: '' };
-        if (!current.degree) current.degree = line;
+        continue;
+      }
+
+      if (lineHasDegree && !current?.degree) {
+        if (current?.institution) {
+          current.degree = trimmedLine;
+        } else {
+          current = { degree: trimmedLine, institution: '', year: '' };
+        }
+        continue;
+      }
+
+      if (current?.institution && !current?.degree && trimmedLine.length < 80) {
+        current.degree = trimmedLine;
       }
     }
 
-    if (current?.degree) {
+    if (current?.degree || current?.institution) {
       education.push(current as Education);
     }
 
     return education;
   }
 
-  private parseSkillsSection(lines: string[], startIdx: number): string[] {
+  private cleanEducationValue(value: string): string {
+    let cleaned = value
+      .replace(/Buenos Aires$/, '')
+      .replace(/Argentina$/, '')
+      .replace(/Madrid$/, '')
+      .replace(/Barcelona$/, '')
+      .replace(/México$/, '')
+      .trim();
+
+    cleaned = cleaned.replace(/[-,]\s*$/, '').trim();
+
+    return cleaned;
+  }
+
+  private parseSkillsSection(lines: string[], startIdx: number, endIdx: number): { skills: string[]; languages: Array<{ language: string; level: string }> } {
     const skills: string[] = [];
+    const languages: Array<{ language: string; level: string }> = [];
 
-    for (let i = startIdx; i < lines.length; i++) {
+    const languageKeywordsEs = ['Inglés', 'Español', 'Portugués', 'Francés', 'Alemán', 'Italiano'];
+    const languageKeywordsEn = ['English', 'Spanish', 'Portuguese', 'French', 'German', 'Italian'];
+
+    for (let i = startIdx; i <= endIdx && i < lines.length; i++) {
       const line = lines[i];
+      const trimmedLine = line.trim();
 
-      if (line.startsWith('-')) {
-        const cleaned = line.replace(/^-\s*/, '').replace(/^Tecnologias:\s*/i, '').replace(/^Testing:\s*/i, '').replace(/^Herramientas.*:\s*/i, '');
-        const parts = cleaned.split(/[,;]/).map(s => s.trim()).filter(s => s.length > 1);
-        skills.push(...parts);
+      if (!trimmedLine || trimmedLine === '1') continue;
+
+      if (trimmedLine.startsWith('Links') || trimmedLine.startsWith('CONTACT')) {
+        break;
       }
 
-      if (line.includes('Inglés') || line.includes('English')) {
-        const langMatch = line.match(/(Inglés|English)[^\w]*([A-Za-z0-9]+)?/);
-        if (langMatch && !skills.includes('English')) {
-          skills.push('English');
+      if (trimmedLine.includes(':') && !trimmedLine.startsWith('-')) {
+        const colonIndex = trimmedLine.indexOf(':');
+        const category = trimmedLine.substring(0, colonIndex).trim();
+        const valuePart = trimmedLine.substring(colonIndex + 1).trim();
+
+        if (category.toLowerCase().includes('idioma') || category.toLowerCase().includes('language')) {
+          const langResult = this.parseLanguageFromLine(valuePart, languageKeywordsEs, languageKeywordsEn);
+          if (langResult) {
+            languages.push(langResult);
+          }
+        }
+
+        const parsedSkills = this.parseSkillsList(valuePart);
+        skills.push(...parsedSkills);
+        continue;
+      }
+
+      if (trimmedLine.startsWith('-')) {
+        const cleaned = trimmedLine.replace(/^-\s*/, '');
+        const parsedSkills = this.parseSkillsList(cleaned);
+
+        for (const skill of parsedSkills) {
+          const langResult = this.detectLanguageInText(skill, languageKeywordsEs, languageKeywordsEn);
+          if (langResult && !languages.some(l => l.language === langResult.language)) {
+            languages.push(langResult);
+          } else if (!skills.includes(skill)) {
+            skills.push(skill);
+          }
+        }
+        continue;
+      }
+
+      const commaSkills = trimmedLine.split(',').map(s => s.trim()).filter(s => s.length > 1);
+      for (const skill of commaSkills) {
+        const langResult = this.detectLanguageInText(skill, languageKeywordsEs, languageKeywordsEn);
+        if (langResult && !languages.some(l => l.language === langResult.language)) {
+          languages.push(langResult);
+        } else if (!skill.includes(':') && !skill.match(/^\d{4}/)) {
+          const cleanedSkill = skill.replace(/[.,;:]\s*$/, '').trim();
+          if (cleanedSkill && !skills.includes(cleanedSkill)) {
+            skills.push(cleanedSkill);
+          }
         }
       }
     }
 
-    return [...new Set(skills)];
+    return { skills: [...new Set(skills)], languages };
+  }
+
+  private parseLanguageFromLine(line: string, langKeywordsEs: string[], langKeywordsEn: string[]): { language: string; level: string } | null {
+    const allLangKeywords = [...langKeywordsEs, ...langKeywordsEn];
+
+    for (const lang of allLangKeywords) {
+      if (line.includes(lang)) {
+        const level = this.extractLevel(line) || 'Intermediate';
+        const languageName = lang === 'Inglés' ? 'English' : lang === 'Español' ? 'Spanish' : lang;
+        return { language: languageName, level };
+      }
+    }
+    return null;
+  }
+
+  private detectLanguageInText(text: string, langKeywordsEs: string[], langKeywordsEn: string[]): { language: string; level: string } | null {
+    const allLangKeywords = [...langKeywordsEs, ...langKeywordsEn];
+
+    for (const lang of allLangKeywords) {
+      if (text.includes(lang)) {
+        const level = this.extractLevel(text) || 'Intermediate';
+        const languageName = lang === 'Inglés' ? 'English' : lang === 'Español' ? 'Spanish' : lang;
+        return { language: languageName, level };
+      }
+    }
+
+    const englishMatch = text.match(/Ingl[eé]s\s*\(([^)]+)\)/i);
+    if (englishMatch) {
+      return { language: 'English', level: englishMatch[1] };
+    }
+
+    return null;
+  }
+
+  private extractLevel(text: string): string | null {
+    const levelKeywords = ['Nativo', 'Native', 'Avanzado', 'Advanced', 'Intermedio', 'Intermediate', 'Básico', 'Basic', 'Fluent', 'Proficient'];
+
+    for (const level of levelKeywords) {
+      if (text.includes(level)) {
+        return level;
+      }
+    }
+
+    const parenMatch = text.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+      return parenMatch[1];
+    }
+
+    return null;
+  }
+
+  private parseSkillsList(line: string): string[] {
+    const skills: string[] = [];
+    const separators = /[,;|]/;
+    const parts = line.split(separators).map(s => s.trim()).filter(s => s.length > 1 && s.length < 50);
+
+    for (const part of parts) {
+      const cleaned = part.replace(/[.,;:]\s*$/, '').trim();
+
+      if (cleaned.match(/^\d{4}$/) || cleaned.match(/^-+$/) || cleaned.match(/^Tecnologias?$/i) || cleaned.match(/^Herramientas?$/i)) {
+        continue;
+      }
+
+      if (cleaned && !cleaned.includes('@') && !cleaned.startsWith('http') && !cleaned.match(/^(Frontend|Backend|Testing|Herramientas)/i)) {
+        skills.push(cleaned);
+      }
+    }
+
+    return skills;
+  }
+
+  private mergeLanguages(existing: Array<{ language: string; level: string }>, newOnes: Array<{ language: string; level: string }>): Array<{ language: string; level: string }> {
+    const result = [...existing];
+
+    for (const lang of newOnes) {
+      if (!result.some(l => l.language === lang.language)) {
+        result.push(lang);
+      }
+    }
+
+    return result;
   }
 }
