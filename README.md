@@ -1,28 +1,37 @@
 # CV Adapter
 
-CLI tool to generate tailored CVs from job vacancies using AI.
+CLI en TypeScript que genera CVs adaptados a ofertas de trabajo usando IA. Salida directa en PDF formato Harvard, sin dependencias de navegador.
+
+## Features
+
+- **Multi-provider AI**: Groq, Gemini, OpenAI, Anthropic, Ollama
+- **Skills categorizadas** (Languages, Frameworks, Tools, etc.) generadas automáticamente por la IA
+- **PDF directo con pdfmake** — no requiere Chromium ni dependencias externas
+- **Bilingüe**: español / inglés
+- **Perfil reutilizable** almacenado en `~/.cv-adapter/profile.json`
+- **Formato Harvard**: limpio, ATS-friendly, 1 página
 
 ## Setup
 
 ```bash
-cd cv-adapter
 pnpm install
 ```
 
-Copy `.env.example` to `.env` and add your API key:
+Copiá `.env.example` a `.env` y agregá tu API key:
 
 ```bash
 cp .env.example .env
 ```
 
-Get your API key from:
-- **Groq** (recommended, free): https://console.groq.com
+Obtené tu API key desde:
+- **Groq** (recomendado, free): https://console.groq.com
 - **Gemini**: https://aistudio.google.com
 - **OpenAI**: https://platform.openai.com
 - **Anthropic**: https://console.anthropic.com
 - **Ollama** (local): https://ollama.ai
 
-Edit `.env`:
+Editá `.env`:
+
 ```bash
 ACTIVE_PROVIDER=groq
 AI_API_KEY=your_key_here
@@ -30,7 +39,7 @@ AI_API_KEY=your_key_here
 
 ## Usage
 
-### Development mode (no build needed)
+### Modo desarrollo (sin build)
 
 ```bash
 pnpm dev -- init --pdf ~/cv/CV.pdf --lang es
@@ -38,7 +47,7 @@ pnpm dev -- generate "Senior Python Developer at Mercado Libre - Requirements: P
 pnpm dev -- profile --show
 ```
 
-### Production mode (after building)
+### Modo producción (después de buildear)
 
 ```bash
 pnpm build
@@ -46,7 +55,7 @@ node dist/main.js init --pdf ~/cv/CV.pdf --lang es
 node dist/main.js generate "Senior Python Developer at Mercado Libre"
 ```
 
-### As global CLI command (after linking)
+### Como CLI global (después de linkear)
 
 ```bash
 pnpm link --global
@@ -54,44 +63,46 @@ cv init --pdf ~/cv/CV.pdf --lang es
 cv generate "Senior Python Developer at Mercado Libre"
 ```
 
-Or use npx (no linking needed):
+O usá `npx` (sin linkear):
 
 ```bash
 npx cv init --pdf ~/cv/CV.pdf --lang es
 ```
 
-### Initialize profile from your CV PDF
+### Inicializar perfil desde tu CV en PDF
 
 ```bash
 pnpm dev -- init --pdf ~/cv/CV_Lucas_Villanueva.pdf --lang es
 ```
 
-### Generate CV for a job vacancy
+### Generar CV para una oferta
 
 ```bash
 pnpm dev -- generate "Senior Python Developer at Mercado Libre - Requirements: Python, Django, PostgreSQL, 3+ years experience"
 ```
 
-The command will:
-1. Load your profile
-2. Ask for language (es/en)
-3. Call AI to generate tailored CV
-4. Open preview in browser
-5. Click "Descargar PDF" to save
+El comando:
+1. Carga tu perfil
+2. Pregunta el idioma (es/en) si no se especificó
+3. Llama a la IA para generar un CV adaptado con skills categorizadas
+4. Pregunta el nombre del archivo de salida
+5. Genera el PDF directamente y lo guarda en el directorio actual
 
-### Other commands
+Ejemplo de output: `cv-senior-python.pdf` en tu working directory.
+
+### Otros comandos
 
 ```bash
-# Update profile with new CV
+# Actualizar perfil con un nuevo CV
 pnpm dev -- update --pdf ~/cv/new_cv.pdf
 
-# Show current profile
+# Ver perfil actual
 pnpm dev -- profile --show
 
-# Edit profile manually
+# Editar perfil manualmente
 pnpm dev -- profile --edit
 
-# Interactive mode
+# Modo interactivo (menú)
 pnpm dev -- interactive
 ```
 
@@ -99,26 +110,34 @@ pnpm dev -- interactive
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev -- init --pdf <path>` | Create profile from PDF |
-| `pnpm dev -- update --pdf <path>` | Update profile from new PDF |
-| `pnpm dev -- generate "<vacancy>"` | Generate CV for vacancy |
-| `pnpm dev -- profile --show` | View current profile |
-| `pnpm dev -- profile --edit` | Edit profile in $EDITOR |
-| `pnpm dev -- interactive` | Interactive menu mode |
+| `pnpm dev -- init --pdf <path>` | Crear perfil desde PDF |
+| `pnpm dev -- update --pdf <path>` | Actualizar perfil desde nuevo PDF |
+| `pnpm dev -- generate "<vacancy>"` | Generar CV adaptado a oferta |
+| `pnpm dev -- profile --show` | Ver perfil actual |
+| `pnpm dev -- profile --edit` | Editar perfil en $EDITOR |
+| `pnpm dev -- interactive` | Modo interactivo (menú) |
 
 ## Project structure
 
 ```
 cv-adapter/
 ├── src/
-│   ├── domain/           # Core entities (Profile, CVData, errors)
-│   ├── application/      # Use cases and commands
-│   ├── interfaces/       # Contracts (IParser, IAIProvider, etc)
-│   └── infrastructure/    # Adapters (PDF parser, AI providers, etc)
-├── templates/
-│   └── harvard.ejs       # CV template
-├── bin/
-│   └── cv                # CLI entry point
+│   ├── domain/                    # Entidades core (Profile, CVData, errors)
+│   │   ├── entities/
+│   │   └── errors/
+│   ├── application/               # Casos de uso
+│   │   ├── commands/              # Comandos CLI (Init, Update, Generate, Profile)
+│   │   └── services/              # Servicios (GenerateCV, ParseProfile)
+│   ├── interfaces/                # Contratos (IAIProvider, IParser, IProfileRepository)
+│   ├── infrastructure/            # Adaptadores
+│   │   ├── ai/                    # Providers (Groq, Gemini, OpenAI, Anthropic, Ollama)
+│   │   ├── parsers/               # PDFParser
+│   │   ├── pdf/                   # PDFGenerator, CVDataToPdfmakeConverter
+│   │   └── repositories/          # JSONProfileRepository
+│   ├── types/                     # TypeScript declarations
+│   └── main.ts                    # Entry point
+├── test-data/                     # Mock data para tests
+├── tests/                         # Tests (unit + integration)
 ├── package.json
 ├── tsconfig.json
 └── .env.example
@@ -132,12 +151,19 @@ cv-adapter/
 ## Troubleshooting
 
 **"No profile found" error**
-Run: `pnpm dev -- init --pdf ~/path/to/your/cv.pdf`
 
-**AI errors**
-- Check your `AI_API_KEY` in `.env`
-- Verify `ACTIVE_PROVIDER` is set correctly
-- For Ollama, ensure `ollama serve` is running
+Ejecutá primero: `pnpm dev -- init --pdf ~/path/to/your/cv.pdf`
 
-**PDF parsing fails**
-Ensure your PDF has selectable text (not scanned images)
+**Errores de IA**
+
+- Verificá que `AI_API_KEY` esté bien configurada en `.env`
+- Confirmá que `ACTIVE_PROVIDER` sea uno de: `groq`, `gemini`, `openai`, `anthropic`, `ollama`
+- Para Ollama, asegurate de que `ollama serve` esté corriendo
+
+**PDF parsing falla**
+
+Asegurate de que el PDF tenga texto seleccionable (no sea una imagen escaneada).
+
+**Skills no aparecen categorizadas**
+
+La IA puede no categorizarlas en la primera iteración. Re-generá el CV o ajustá el prompt en `src/infrastructure/ai/`.
