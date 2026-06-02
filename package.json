@@ -1,0 +1,38 @@
+{
+  "name": "cv-adapter",
+  "version": "1.0.0",
+  "description": "CLI tool to generate tailored CVs from job vacancies using AI",
+  "type": "module",
+  "bin": {
+    "cv": "./bin/cv"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/main.ts",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "dotenv": "^16.4.0",
+    "ejs": "^3.1.10",
+    "express": "^4.18.0",
+    "html-pdf-node": "^1.0.8",
+    "inquirer": "^9.2.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/express": "^5.0.6",
+    "@types/inquirer": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.8",
+    "vitest-mock-extended": "^4.0.0"
+  }
+}
