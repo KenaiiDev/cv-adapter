@@ -2,6 +2,8 @@ import type { Profile } from '../../domain/entities/Profile.js';
 import type { CVData } from '../../domain/entities/CVData.js';
 import type { IAIProvider, Language } from '../../interfaces/IAIProvider.js';
 import { PromptBuilder, getCurrentDate, type PromptOptions } from './PromptBuilder.js';
+import { CVDataSchema, formatZodError } from './schemas.js';
+import { DomainError } from '../../domain/errors/DomainError.js';
 
 export abstract class BaseAIProvider implements IAIProvider {
   abstract getProviderName(): string;
@@ -16,8 +18,18 @@ export abstract class BaseAIProvider implements IAIProvider {
 
     const response = await this.callAPI(prompt);
 
-    const cvData = this.parseResponse(response);
+    const raw = this.parseResponse(response);
 
+    const result = CVDataSchema.safeParse(raw);
+    if (!result.success) {
+      throw new DomainError(
+        'AI returned malformed CVData',
+        'AI_VALIDATION',
+        formatZodError(result.error)
+      );
+    }
+
+    const cvData = result.data;
     return {
       name: cvData.name || profile.name,
       contact: cvData.contact || profile.contact,

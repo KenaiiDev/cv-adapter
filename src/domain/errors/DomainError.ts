@@ -1,6 +1,7 @@
 export type ErrorCode =
   | 'PARSE_ERROR'
   | 'AI_ERROR'
+  | 'AI_VALIDATION'
   | 'PROFILE_NOT_FOUND'
   | 'INVALID_LANG'
   | 'FILE_NOT_FOUND'
