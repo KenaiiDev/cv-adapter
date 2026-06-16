@@ -14,8 +14,6 @@ export class GenerateCV {
 
     const cvData = await this.aiProvider.generateCV(profile, vacancy, language);
 
-    console.log(`✅ CV generated successfully`);
-
     return cvData;
   }
 }

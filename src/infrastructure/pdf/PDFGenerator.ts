@@ -21,6 +21,8 @@ export class PDFGenerator implements IPDFGenerator {
     const docDefinition = converter.toDocDefinition(cvData, language);
 
     const pdfmake = require('pdfmake/js/index.js');
+    pdfmake.setUrlAccessPolicy?.(() => true);
+    pdfmake.setLocalAccessPolicy?.(() => true);
     pdfmake.addFonts(fonts);
 
     const doc = pdfmake.createPdf(docDefinition);
