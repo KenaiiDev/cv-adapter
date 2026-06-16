@@ -1,16 +1,18 @@
 import type { Profile } from '../../domain/entities/Profile.js';
 import type { CVData } from '../../domain/entities/CVData.js';
 import type { IAIProvider, Language } from '../../interfaces/IAIProvider.js';
+import { PromptBuilder, getCurrentDate, type PromptOptions } from './PromptBuilder.js';
 
 export abstract class BaseAIProvider implements IAIProvider {
   abstract getProviderName(): string;
   abstract getModel(): string;
   abstract getEndpoint(): string;
-  protected abstract buildPrompt(profile: Profile, vacancy: string, language: Language): string;
+  protected abstract buildPrompt(profile: Profile, vacancy: string, language: Language, options: PromptOptions): string;
   protected abstract parseResponse(content: string): Partial<CVData>;
 
   async generateCV(profile: Profile, vacancy: string, language: Language): Promise<CVData> {
-    const prompt = this.buildPrompt(profile, vacancy, language);
+    const options: PromptOptions = { currentDate: getCurrentDate() };
+    const prompt = this.buildPrompt(profile, vacancy, language, options);
 
     const response = await this.callAPI(prompt);
 
