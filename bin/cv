@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
+set -e
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ ! -f "$PROJECT_DIR/dist/main.js" ]; then
+  echo "❌ dist/main.js not found. Run 'pnpm build' first." >&2
+  exit 1
+fi
 
 if [ -f "$PROJECT_DIR/.env" ]; then
   set -a
