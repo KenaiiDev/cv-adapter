@@ -55,17 +55,18 @@ The user authorized implementation of P0-01: CI, Vitest, production/test typeche
   - Trigger: fixes span seven test files and depend on the canonical test typecheck.
   - Acceptance: test fixtures use domain types and mocks retain their mock-aware types without weakening production contracts.
   - Evidence: seven test files now use `SkillCategory` fixtures and preserve `MockProxy<T>` types; `pnpm typecheck:test` passes without weakening production interfaces.
-- [ ] **P0-01-C — Verify and commit the baseline**
+- [x] **P0-01-C — Verify and commit the baseline**
   - Route: delegated verification as required by risk assessment, plus parent spot check.
   - Acceptance: all applicable checks pass; unrelated `.atl/` files remain untouched; one Conventional Commit records the work unit.
-  - Evidence: writer and independent verifier observed `pnpm typecheck`, `pnpm test` (14 files, 171 tests), `pnpm build`, and `git diff --check` passing. `pnpm install --frozen-lockfile`, both explicit typechecks, and explicit/default Vitest runs also passed in writer verification. GitHub-hosted workflow execution remains unavailable locally. Commit pending.
+  - Evidence: writer and independent verifier observed `pnpm typecheck`, `pnpm test` (14 files, 171 tests), `pnpm build`, and `git diff --check` passing. `pnpm install --frozen-lockfile`, both explicit typechecks, and explicit/default Vitest runs also passed in writer verification. Work-unit commit: `278249e` (`chore: align quality checks and toolchain`). Receipt-driven development was off by default, so delivery remains `disabled/unmanaged`. GitHub-hosted workflow execution remains unavailable locally.
 
 ## Progress
 
 - Configuration, workflows, tests, and README are aligned.
 - Production source and `pnpm-lock.yaml` are unchanged.
 - Independent verification found no implementation defect; only GitHub-hosted workflow execution remains an external residual risk.
+- All P0-01 tasks are complete.
 
 ## Next Step
 
-Create the work-unit commit, assess the committed candidate, and record its identity.
+Proceed to the next remediation work unit under ordinary repository policy; pushing or opening a PR remains a separate user decision.
