@@ -47,7 +47,7 @@ AI_API_KEY=your_key_here
 
 ## Usage
 
-> ⚠️ **Importante**: los modos "producción" y "CLI global" requieren haber ejecutado `pnpm build` primero, ya que el binario apunta a `dist/main.js`. En modo desarrollo (`pnpm dev`) no hace falta.
+> ⚠️ **Importante**: el uso local en modo producción y `pnpm link --global` requieren ejecutar `pnpm build` primero. Los archivos `.tgz` adjuntos a los releases ya incluyen la versión compilada.
 
 ### Modo desarrollo (sin build, recomendado para iterar)
 
@@ -68,15 +68,26 @@ node dist/main.js generate "Senior Python Developer at Mercado Libre"
 pnpm start -- init --pdf ~/cv/CV.pdf --lang es
 ```
 
-### Como CLI global (después de linkear)
+### Como CLI global
+
+Desde un checkout local:
 
 ```bash
+pnpm build
 pnpm link --global
 cv init --pdf ~/cv/CV.pdf --lang es
 cv generate "Senior Python Developer at Mercado Libre"
 ```
 
-> `npx cv ...` solo funciona si el paquete está publicado en npm **o** si previamente hiciste `pnpm link --global` en este repo.
+Desde un archivo `cv-adapter-*.tgz` descargado de un release:
+
+```bash
+pnpm add --global ./cv-adapter-1.0.0.tgz
+cv --help
+cv --version
+```
+
+> El proyecto no publica el paquete en npm. `npx cv ...` no es un método de instalación compatible.
 
 ### Inicializar perfil desde tu CV en PDF
 
@@ -184,8 +195,6 @@ cv-adapter/
 │   ├── unit/
 │   ├── integration/
 │   └── helpers/
-├── bin/
-│   └── cv                            # Wrapper bash (carga .env + ejecuta dist/)
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml                    # Tests + build en PRs
@@ -225,7 +234,9 @@ Aliases disponibles: `@domain/*`, `@application/*`, `@interfaces/*`, `@infrastru
 pnpm build             # tsc → dist/
 ```
 
-Output: `dist/main.js` (ejecutable vía `node`, `pnpm start` o `bin/cv`).
+Output: `dist/main.js` (ejecutable mediante `node`, `pnpm start` o el comando `cv` después de instalar o enlazar el paquete).
+
+`pnpm build` elimina primero cualquier `dist/` anterior. El paquete de release incluye únicamente JavaScript compilado, metadatos, README y licencia; no incluye fuentes, tests, archivos de entorno ni datos locales.
 
 ## Requirements
 
@@ -239,9 +250,9 @@ Output: `dist/main.js` (ejecutable vía `node`, `pnpm start` o `bin/cv`).
 
 Ejecutá primero: `pnpm dev -- init --pdf ~/path/to/your/cv.pdf`
 
-**`bin/cv` o `cv` (global) falla con "dist/main.js not found"**
+**`cv` enlazado desde un checkout local falla con "dist/main.js not found"**
 
-Necesitás buildear antes de usar el wrapper: `pnpm build`.
+Ejecute `pnpm build` antes de `pnpm link --global`. Los archivos `.tgz` de release ya contienen `dist/`.
 
 **Errores de IA**
 

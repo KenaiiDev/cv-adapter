@@ -8,11 +8,15 @@
     "node": "^20.19.0 || >=22.12.0",
     "pnpm": "10.26.0"
   },
+  "files": [
+    "dist/**/*.js"
+  ],
   "bin": {
-    "cv": "./bin/cv"
+    "cv": "./dist/main.js"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc --project tsconfig.json",
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
     "typecheck:prod": "tsc --project tsconfig.json --noEmit",

@@ -2,17 +2,21 @@
 
 import { Command } from 'commander';
 import inquirer from 'inquirer';
+import { readFileSync } from 'node:fs';
 import { initCommand } from './application/commands/InitCommand.js';
 import { updateCommand } from './application/commands/UpdateCommand.js';
 import { generateCommand } from './application/commands/GenerateCommand.js';
 import { showProfileCommand, editProfileCommand } from './application/commands/ProfileCommand.js';
 
 const program = new Command();
+const { version } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+) as { version: string };
 
 program
   .name('cv')
   .description('CV Adapter - Generate tailored CVs from job vacancies')
-  .version('1.0.0');
+  .version(version);
 
 program
   .command('init')
@@ -115,4 +119,4 @@ program
     }
   });
 
-program.parse();
+await program.parseAsync();
