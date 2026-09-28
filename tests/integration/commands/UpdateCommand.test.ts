@@ -1,22 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IProfileRepository } from '../../../src/interfaces/IProfileRepository.ts';
 import type { ParseProfile } from '../../../src/application/services/ParseProfile.ts';
 import type { Logger } from '../../../src/interfaces/Logger.ts';
+import type { Profile } from '../../../src/domain/entities/Profile.ts';
 import { UpdateCommand } from '../../../src/application/commands/UpdateCommand.ts';
 
 describe('UpdateCommand', () => {
-  let mockRepo: IProfileRepository;
-  let mockParseProfile: ParseProfile;
-  let mockLogger: Logger;
+  let mockRepo: MockProxy<IProfileRepository>;
+  let mockParseProfile: MockProxy<ParseProfile>;
+  let mockLogger: MockProxy<Logger>;
   let command: UpdateCommand;
 
-  const mockProfile = {
+  const mockProfile: Profile = {
     name: 'Updated User',
     contact: { email: 'updated@example.com' },
     experience: [],
     education: [],
-    skills: ['TypeScript'],
+    skills: [{ category: 'Languages', items: ['TypeScript'] }],
     languages: [],
     updated_at: '2024-01-02',
   };

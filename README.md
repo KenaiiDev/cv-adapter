@@ -1,9 +1,9 @@
 # CV Adapter
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Node ^20.19 or >=22.12](https://img.shields.io/badge/node-%5E20.19%20%7C%7C%20%3E%3D22.12-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![pnpm](https://img.shields.io/badge/pnpm-8.x-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
+[![pnpm](https://img.shields.io/badge/pnpm-10.26.0-F69220?logo=pnpm&logoColor=white)](https://pnpm.io)
 
 CLI en TypeScript que genera CVs adaptados a ofertas de trabajo usando IA. Salida directa en PDF formato Harvard, sin dependencias de navegador.
 
@@ -134,6 +134,7 @@ pnpm dev -- i
 | `pnpm test` | Correr suite de tests (Vitest) |
 | `pnpm test:watch` | Tests en modo watch |
 | `pnpm test:coverage` | Tests con reporte de coverage |
+| `pnpm typecheck` | Verificar tipos de producción y tests |
 
 ## Project structure
 
@@ -202,6 +203,7 @@ cv-adapter/
 pnpm test              # Suite completa (Vitest)
 pnpm test:watch        # Modo watch
 pnpm test:coverage     # Con reporte de coverage
+pnpm typecheck         # Tipos de producción y tests
 ```
 
 ### Path aliases
@@ -227,8 +229,8 @@ Output: `dist/main.js` (ejecutable vía `node`, `pnpm start` o `bin/cv`).
 
 ## Requirements
 
-- **Node.js 18+** (testeado en 20.x, target ES2022)
-- **pnpm 8+** (https://pnpm.io)
+- **Node.js ^20.19 o >=22.12** (requerido por el toolchain actual; target ES2022)
+- **pnpm 10.26.0** (https://pnpm.io)
 - API key de alguno de los providers soportados
 
 ## Troubleshooting
@@ -266,7 +268,7 @@ Las PRs son bienvenidas. Para cambios grandes:
 
 1. Abrí un issue primero describiendo el cambio
 2. Fork + branch (`feature/...` o `fix/...`)
-3. Asegurate de que `pnpm test` y `pnpm build` pasen
+3. Asegúrate de que `pnpm typecheck`, `pnpm test` y `pnpm build` pasen
 4. Mantené la arquitectura hexagonal — nuevas fuentes/sinks van en `infrastructure/`, nuevos casos de uso en `application/`
 
 ## License

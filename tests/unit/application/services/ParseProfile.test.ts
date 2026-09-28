@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock, mockReset } from 'vitest-mock-extended';
+import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IParser } from '../../../../src/interfaces/IParser.ts';
 import type { IProfileRepository } from '../../../../src/interfaces/IProfileRepository.ts';
 import type { Profile } from '../../../../src/domain/entities/Profile.ts';
@@ -11,8 +11,8 @@ vi.mock('fs', () => ({
 }));
 
 describe('ParseProfile', () => {
-  let mockParser: IParser;
-  let mockRepo: IProfileRepository;
+  let mockParser: MockProxy<IParser>;
+  let mockRepo: MockProxy<IProfileRepository>;
   let parseProfile: ParseProfile;
 
   const mockProfile: Profile = {
@@ -31,7 +31,7 @@ describe('ParseProfile', () => {
       institution: 'University',
       year: '2019',
     }],
-    skills: ['JavaScript', 'TypeScript'],
+    skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
     languages: [{ language: 'English', level: 'Fluent' }],
     updated_at: '2024-01-01',
   };

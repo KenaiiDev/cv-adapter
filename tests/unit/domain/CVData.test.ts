@@ -84,7 +84,7 @@ describe('CVData', () => {
           institution: 'University of Buenos Aires',
           year: '2018',
         }],
-        skills: ['TypeScript', 'React', 'Node.js'],
+        skills: [{ category: 'Technical', items: ['TypeScript', 'React', 'Node.js'] }],
         languages: [{ language: 'English', level: 'C1' }],
         generated_at: '2024-01-15T10:30:00.000Z',
       };
@@ -93,7 +93,7 @@ describe('CVData', () => {
       expect(cvData.contact.email).toBe('john@example.com');
       expect(cvData.experience.length).toBe(1);
       expect(cvData.education.length).toBe(1);
-      expect(cvData.skills.length).toBe(3);
+      expect(cvData.skills[0].items).toHaveLength(3);
       expect(cvData.languages.length).toBe(1);
     });
 

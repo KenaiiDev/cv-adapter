@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IProfileRepository } from '../../../src/interfaces/IProfileRepository.ts';
 import type { Logger } from '../../../src/interfaces/Logger.ts';
+import type { Profile } from '../../../src/domain/entities/Profile.ts';
 import { ShowProfileCommand, EditProfileCommand } from '../../../src/application/commands/ProfileCommand.ts';
 
 describe('ProfileCommand', () => {
   describe('ShowProfileCommand', () => {
-    let mockRepo: IProfileRepository;
-    let mockLogger: Logger;
+    let mockRepo: MockProxy<IProfileRepository>;
+    let mockLogger: MockProxy<Logger>;
     let command: ShowProfileCommand;
 
-    const mockProfile = {
+    const mockProfile: Profile = {
       name: 'John Doe',
       contact: { email: 'john@example.com' },
       summary: 'Experienced developer',
@@ -26,7 +27,7 @@ describe('ProfileCommand', () => {
         institution: 'University',
         year: '2019',
       }],
-      skills: ['JavaScript', 'TypeScript'],
+      skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
       languages: [{ language: 'English', level: 'Fluent' }],
       updated_at: '2024-01-01',
     };
@@ -75,7 +76,7 @@ describe('ProfileCommand', () => {
   });
 
   describe('EditProfileCommand', () => {
-    let mockLogger: Logger;
+    let mockLogger: MockProxy<Logger>;
     let command: EditProfileCommand;
 
     beforeEach(() => {

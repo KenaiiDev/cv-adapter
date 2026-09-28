@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IParser } from '../../../src/interfaces/IParser.ts';
 import type { IProfileRepository } from '../../../src/interfaces/IProfileRepository.ts';
 import type { ParseProfile } from '../../../src/application/services/ParseProfile.ts';
 import type { Logger } from '../../../src/interfaces/Logger.ts';
+import type { Profile } from '../../../src/domain/entities/Profile.ts';
 import { InitCommand } from '../../../src/application/commands/InitCommand.ts';
 
 describe('InitCommand', () => {
-  let mockParser: IParser;
-  let mockRepo: IProfileRepository;
-  let mockParseProfile: ParseProfile;
-  let mockLogger: Logger;
+  let mockParser: MockProxy<IParser>;
+  let mockRepo: MockProxy<IProfileRepository>;
+  let mockParseProfile: MockProxy<ParseProfile>;
+  let mockLogger: MockProxy<Logger>;
   let command: InitCommand;
 
-  const mockProfile = {
+  const mockProfile: Profile = {
     name: 'Test User',
     contact: { email: 'test@example.com' },
     experience: [],
     education: [],
-    skills: ['JavaScript'],
+    skills: [{ category: 'Languages', items: ['JavaScript'] }],
     languages: [],
     updated_at: '2024-01-01',
   };
