@@ -70,15 +70,16 @@ tracker branch (not created remotely)
   - Trigger: release packaging and README must stay synchronized with executable behavior.
   - Acceptance: the release job inspects and executes the produced tarball before attachment; README claims match supported local and packaged workflows.
   - Evidence: the release job asserts tarball contents, links the extracted package into an isolated external consumer, and runs help/version through the generated `cv` shim; README installation, build, and package-content claims match the implementation.
-- [ ] **P0-02-D — Verify and commit the slice**
+- [x] **P0-02-D — Verify and commit the slice**
   - Route: delegated verification according to native risk plus parent spot check.
   - Acceptance: local checks and isolated artifact execution pass; `.atl/`, `pnpm-lock.yaml`, and unrelated files remain untouched; Conventional Commit evidence is recorded.
-  - Evidence: writer and independent verifier observed `pnpm typecheck`, 14 test files/167 tests, `pnpm clean`, `pnpm build`, `git diff --check`, dry-run packing, external archive assertions, and generated-`cv` shim smoke scenarios passing. The isolated extraction reused repository dependencies through a disclosed symlink without network access. A genuine offline install remained unavailable because the local cache lacked `dotenv`; link semantics and the generated executable shim passed. Commit identity remains for the parent to record.
+  - Evidence: writer and independent verifier observed `pnpm typecheck`, 14 test files/167 tests, `pnpm clean`, `pnpm build`, `git diff --check`, dry-run packing, external archive assertions, and generated-`cv` shim smoke scenarios passing. The isolated extraction reused repository dependencies through a disclosed symlink without network access. A genuine offline install remained unavailable because the local cache lacked `dotenv`; link semantics and the generated executable shim passed. Work-unit commit: `230aaa0` (`fix: ship runnable CLI package`). Receipt-driven development was off by default, so delivery remains `disabled/unmanaged`.
 
 ## Progress
 
-- P0-02 implementation and independent verification completed without a commit; parent commit recording remains pending.
+- P0-02 implementation, independent verification, bounded correction, and work-unit commit are complete.
+- All P0-02 tasks are complete.
 
 ## Next Step
 
-Parent records the work-unit commit identity after review.
+Proceed to the next remediation unit under ordinary repository policy; pushing or creating the feature-branch PR chain remains a separate user decision.
