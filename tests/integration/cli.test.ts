@@ -54,4 +54,10 @@ describe('CLI process boundary', () => {
       ),
     });
   });
+
+  it('exposes explicit approval for non-interactive profile updates', async () => {
+    const result = await runCli('update', '--help');
+
+    expect(result.stdout).toContain('--yes');
+  });
 });

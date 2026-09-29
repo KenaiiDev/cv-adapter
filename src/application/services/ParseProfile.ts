@@ -1,14 +1,10 @@
 import * as fs from 'fs';
-import type { Profile } from '../../domain/entities/Profile.js';
+import { validateProfile, type Profile } from '../../domain/entities/Profile.js';
 import type { IParser } from '../../interfaces/IParser.js';
-import type { IProfileRepository } from '../../interfaces/IProfileRepository.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 
 export class ParseProfile {
-  constructor(
-    private parser: IParser,
-    private repository: IProfileRepository
-  ) {}
+  constructor(private parser: IParser) {}
 
   async fromPDF(filePath: string, lang: 'es' | 'en' = 'es'): Promise<Profile> {
     if (!fs.existsSync(filePath)) {
@@ -23,16 +19,7 @@ export class ParseProfile {
 
     const name = this.extractName(text);
 
-    const profile = this.parser.toProfile(text, name);
-
-    await this.repository.save(profile);
-
-    console.log(`✅ Profile saved to ~/.cv-adapter/profile.json`);
-    console.log(`   Name: ${profile.name}`);
-    console.log(`   Experience: ${profile.experience.length} entries`);
-    console.log(`   Skills: ${profile.skills.length} items`);
-
-    return profile;
+    return validateProfile(this.parser.toProfile(text, name));
   }
 
   private extractName(text: string): string {

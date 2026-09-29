@@ -6,6 +6,8 @@ export type ErrorCode =
   | 'INVALID_LANG'
   | 'FILE_NOT_FOUND'
   | 'INVALID_JSON'
+  | 'INVALID_PROFILE'
+  | 'UPDATE_CONFIRMATION_REQUIRED'
   | 'RENDER_ERROR'
   | 'PDF_ERROR';
 

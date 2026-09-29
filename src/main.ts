@@ -32,8 +32,9 @@ program
   .description('Update profile from a new PDF')
   .requiredOption('--pdf <path>', 'Path to PDF file')
   .option('--lang <es|en>', 'Language of the CV', 'es')
+  .option('--yes', 'Replace the profile without interactive confirmation')
   .action(async (opts) => {
-    await updateCommand.execute(opts.pdf, opts.lang);
+    await updateCommand.execute(opts.pdf, opts.lang, { yes: opts.yes });
   });
 
 program
