@@ -74,10 +74,14 @@ tracker branch (not created remotely)
   - Route: delegated verification according to native risk plus parent spot check.
   - Acceptance: local checks and isolated artifact execution pass; `.atl/`, `pnpm-lock.yaml`, and unrelated files remain untouched; Conventional Commit evidence is recorded.
   - Evidence: writer and independent verifier observed `pnpm typecheck`, 14 test files/167 tests, `pnpm clean`, `pnpm build`, `git diff --check`, dry-run packing, external archive assertions, and generated-`cv` shim smoke scenarios passing. The isolated extraction reused repository dependencies through a disclosed symlink without network access. A genuine offline install remained unavailable because the local cache lacked `dotenv`; link semantics and the generated executable shim passed. Work-unit commit: `230aaa0` (`fix: ship runnable CLI package`). Receipt-driven development was off by default, so delivery remains `disabled/unmanaged`.
+- [x] **P0-02-E — Stabilize editor-failure regression test**
+  - Route: bounded test-only correction after CI exposed an invalid `process.exec` mock seam.
+  - Acceptance: mock the dynamically imported `child_process.exec` boundary, resolve the callback asynchronously without a time delay, and retain strict TypeScript checking.
+  - Evidence: narrowed the overloaded `exec` mock to the callback signature exercised by the test; `pnpm exec vitest run tests/integration/commands/ProfileCommand.test.ts` passed (1 file, 7 tests), `pnpm typecheck` passed, `pnpm test` passed (14 files, 167 tests), `pnpm build` passed, and `git diff --check` passed. Work-unit commit: `ed0e54f` (`test: stabilize editor failure mock`).
 
 ## Progress
 
-- P0-02 implementation, independent verification, bounded correction, and work-unit commit are complete.
+- P0-02 implementation, independent verification, bounded correction, and work-unit commits are complete.
 - All P0-02 tasks are complete.
 
 ## Next Step

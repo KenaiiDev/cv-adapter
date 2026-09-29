@@ -1,0 +1,49 @@
+name: Change or Bug Report
+description: Propose an improvement or report a reproducible problem.
+title: "[Change/Bug]: "
+body:
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Request type
+      description: Select the type of work this issue describes.
+      options:
+        - Change request
+        - Bug report
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-or-outcome
+    attributes:
+      label: Problem or desired outcome
+      description: Clearly describe the problem to solve or the outcome you need.
+      placeholder: Explain what is wrong today or what should be possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale-or-reproduction
+    attributes:
+      label: Change rationale or reproduction and impact
+      description: For changes, explain why this is needed. For bugs, provide reproduction steps and the observed impact.
+      placeholder: Explain the rationale, or list steps to reproduce and who or what is affected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope-and-acceptance-criteria
+    attributes:
+      label: Scope and acceptance criteria
+      description: Define the expected boundaries and observable conditions for completion.
+      placeholder: List what is in scope, what is out of scope if known, and the criteria that prove the work is complete.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: acknowledgement
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I have provided accurate information and reviewed the scope and acceptance criteria.
+          required: true
