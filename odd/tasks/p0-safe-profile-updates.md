@@ -68,9 +68,13 @@ The user explicitly authorized safe profile updates and selected the safe confir
   - Commit: recorded in the final delivery after this tracker is committed as part of the single work unit.
   - Risk result: no separate risk assessment was available; safe-replacement scope, package metadata/version, lockfile, packaging, remotes/network, and `.atl/` were not changed.
   - Rollback: remove staged editing and the process adapter while retaining safe PDF replacement.
-- [ ] **P0-03-C — Verify and record delivery evidence**
+- [x] **P0-03-C — Verify and record delivery evidence**
   - Route: delegated verification according to native risk plus parent spot checks.
   - Acceptance: all applicable checks pass; `.atl/`, `pnpm-lock.yaml`, version, and unrelated behavior remain untouched; each completed work unit has a Conventional Commit identity and risk outcome.
+  - Final independent verification for `6e12eec..edfb883`: PASS. The real-failure CLI regression passed 7/7; the broader profile/editor/update/repository suite passed 30/30; typecheck passed; the full suite passed 192/192 across 16 files; and `git diff --check 6e12eec..edfb883` passed.
+  - Scope verification: `package.json` and `pnpm-lock.yaml` are unchanged across the range, version remains `1.0.0`, and `.atl/` is absent from the committed range.
+  - Work-unit identities: `458c0d6` (`feat(profile): stage manual profile edits safely`) and `edfb883` (`fix(profile): clean staged edits before failure exit`) are Conventional Commits.
+  - Risk outcome: RDD is disabled/unmanaged. No push or pull request was created.
 
 ## Progress
 
@@ -106,7 +110,9 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - Correction GREEN evidence: the same harness exits with code `1` and finds no `.profile-edit-*` entries. Focused profile command, editor process, and CLI suites pass 16 tests; full suite passes 192 tests.
 - Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass. Package metadata/version, `pnpm-lock.yaml`, packaging, remotes/network, dependencies, `.atl/`, and P0-03-C were not changed.
 - Correction work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
+- P0-03-C independent verification for `6e12eec..edfb883`: PASS. The real-failure CLI regression passed 7/7; the broader profile/editor/update/repository suite passed 30/30; typecheck passed; the full suite passed 192/192 across 16 files; and the range diff check passed.
+- Range scope verification confirms `package.json`, version `1.0.0`, and `pnpm-lock.yaml` are unchanged; `.atl/` is absent from committed changes. Conventional work-unit commits are `458c0d6` and `edfb883`. RDD is disabled/unmanaged.
 
 ## Next Step
 
-Perform P0-03-C verification and record delivery evidence without weakening the safe replacement boundary completed in P0-03-A.
+User-controlled delivery only: decide whether to push or open a pull request; no push or pull request is authorized or performed.
