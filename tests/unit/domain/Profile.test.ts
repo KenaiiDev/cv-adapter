@@ -117,14 +117,14 @@ describe('Profile', () => {
           institution: 'Test University',
           year: '2020',
         }],
-        skills: ['JavaScript', 'TypeScript'],
+        skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
         languages: [{ language: 'English', level: 'Fluent' }],
         updated_at: '2024-01-01',
       };
 
       expect(profile.experience.length).toBe(1);
       expect(profile.education.length).toBe(1);
-      expect(profile.skills.length).toBe(2);
+      expect(profile.skills[0].items).toHaveLength(2);
       expect(profile.languages.length).toBe(1);
     });
   });

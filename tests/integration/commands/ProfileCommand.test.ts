@@ -1,16 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { mock, type MockProxy } from 'vitest-mock-extended';
+import { exec, type ChildProcess, type ExecException } from 'child_process';
 import type { IProfileRepository } from '../../../src/interfaces/IProfileRepository.ts';
 import type { Logger } from '../../../src/interfaces/Logger.ts';
+import type { Profile } from '../../../src/domain/entities/Profile.ts';
 import { ShowProfileCommand, EditProfileCommand } from '../../../src/application/commands/ProfileCommand.ts';
+
+vi.mock('child_process', () => ({ exec: vi.fn() }));
+
+type EditorExec = (
+  command: string,
+  callback?: (error: ExecException | null, stdout: string, stderr: string) => void,
+) => ChildProcess;
 
 describe('ProfileCommand', () => {
   describe('ShowProfileCommand', () => {
-    let mockRepo: IProfileRepository;
-    let mockLogger: Logger;
+    let mockRepo: MockProxy<IProfileRepository>;
+    let mockLogger: MockProxy<Logger>;
     let command: ShowProfileCommand;
 
-    const mockProfile = {
+    const mockProfile: Profile = {
       name: 'John Doe',
       contact: { email: 'john@example.com' },
       summary: 'Experienced developer',
@@ -26,7 +35,7 @@ describe('ProfileCommand', () => {
         institution: 'University',
         year: '2019',
       }],
-      skills: ['JavaScript', 'TypeScript'],
+      skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
       languages: [{ language: 'English', level: 'Fluent' }],
       updated_at: '2024-01-01',
     };
@@ -75,10 +84,11 @@ describe('ProfileCommand', () => {
   });
 
   describe('EditProfileCommand', () => {
-    let mockLogger: Logger;
+    let mockLogger: MockProxy<Logger>;
     let command: EditProfileCommand;
 
     beforeEach(() => {
+      vi.unstubAllGlobals();
       mockLogger = mock<Logger>();
       command = new EditProfileCommand('~/.cv-adapter/profile.json', mockLogger);
     });
@@ -122,17 +132,27 @@ describe('ProfileCommand', () => {
       mockLogger.log.mockImplementation(() => {});
       mockLogger.error.mockImplementation(() => {});
 
-      const execMock = vi.fn((cmd: string, callback: (error: Error | null) => void) => {
-        setTimeout(() => callback(new Error('Editor not found')), 0);
+      const execMock = vi.mocked(exec) as unknown as Mock<EditorExec>;
+      const editorFailure = new Error('Editor not found');
+      let reportEditorFailure: () => void;
+      const editorFailureReported = new Promise<void>(resolve => {
+        reportEditorFailure = resolve;
+      });
+      execMock.mockImplementation((_command, callback) => {
+        queueMicrotask(() => {
+          callback?.(editorFailure, '', '');
+          reportEditorFailure();
+        });
+        return undefined as unknown as ChildProcess;
       });
 
       const exitMock = vi.fn();
-      vi.stubGlobal('process', { ...process, exec: execMock, exit: exitMock });
+      vi.stubGlobal('process', { ...process, env: { ...process.env, EDITOR: 'nano' }, exit: exitMock });
 
       await command.execute();
+      await editorFailureReported;
 
-      await new Promise(resolve => setTimeout(resolve, 50));
-
+      expect(execMock).toHaveBeenCalledWith('nano ~/.cv-adapter/profile.json', expect.any(Function));
       expect(mockLogger.error).toHaveBeenCalled();
       expect(exitMock).toHaveBeenCalledWith(1);
     });

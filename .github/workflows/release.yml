@@ -11,24 +11,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: 'package.json'
           cache: 'pnpm'
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
 
-      - run: npm pack
+      - name: Pack, inspect, and smoke-test release artifact
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$(npm pack --silent)"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+          entries="$(tar -tzf "$tarball")"
+          for required in package/package.json package/README.md package/LICENSE package/dist/main.js; do
+            grep -Fxq "$required" <<< "$entries"
+          done
+
+          if grep -Eq '^package/(\.atl|src|tests|node_modules|test-data|odd|bin)(/|$)|^package/\.env($|\.)|\.pdf$' <<< "$entries"; then
+            echo 'Release tarball contains forbidden files.' >&2
+            exit 1
+          fi
+
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+          tar -xzf "$tarball" -C "$smoke_dir"
+          # Reuse installed dependencies while keeping package files isolated from the repository.
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$smoke_dir/package/node_modules"
+          mkdir "$smoke_dir/consumer"
+          node -e "require('node:fs').writeFileSync(process.argv[1], JSON.stringify({ name: 'cv-smoke-consumer', private: true }))" "$smoke_dir/consumer/package.json"
+          pnpm --dir "$smoke_dir/consumer" link "$smoke_dir/package"
+          cv="$smoke_dir/consumer/node_modules/.bin/cv"
+          "$cv" --help
+          expected_version="$(node -e "console.log(require(process.argv[1]).version)" "$smoke_dir/package/package.json")"
+          test "$("$cv" --version)" = "$expected_version"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: cv-adapter-*.tgz
+          files: ${{ steps.package.outputs.tarball }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

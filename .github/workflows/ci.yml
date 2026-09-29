@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   test:
@@ -12,17 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: 'package.json'
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      - run: pnpm typecheck
 
       - run: pnpm test
+
+      - run: pnpm build

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mock, mockReset } from 'vitest-mock-extended';
+import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IAIProvider, Language } from '../../../../src/interfaces/IAIProvider.ts';
 import type { Profile } from '../../../../src/domain/entities/Profile.ts';
 import type { CVData } from '../../../../src/domain/entities/CVData.ts';
 import { GenerateCV } from '../../../../src/application/services/GenerateCV.ts';
 
 describe('GenerateCV', () => {
-  let mockAIProvider: IAIProvider;
+  let mockAIProvider: MockProxy<IAIProvider>;
   let generateCV: GenerateCV;
 
   const mockProfile: Profile = {
@@ -14,7 +14,7 @@ describe('GenerateCV', () => {
     contact: { email: 'john@example.com' },
     experience: [],
     education: [],
-    skills: ['JavaScript'],
+    skills: [{ category: 'Languages', items: ['JavaScript'] }],
     languages: [],
     updated_at: '2024-01-01',
   };
@@ -31,7 +31,7 @@ describe('GenerateCV', () => {
       description: 'Led development',
     }],
     education: [],
-    skills: ['JavaScript', 'TypeScript'],
+    skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
     languages: [{ language: 'English', level: 'Fluent' }],
     generated_at: '2024-01-15T10:00:00.000Z',
   };

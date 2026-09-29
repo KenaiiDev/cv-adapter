@@ -3,13 +3,25 @@
   "version": "1.0.0",
   "description": "CLI tool to generate tailored CVs from job vacancies using AI",
   "type": "module",
+  "packageManager": "pnpm@10.26.0",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0",
+    "pnpm": "10.26.0"
+  },
+  "files": [
+    "dist/**/*.js"
+  ],
   "bin": {
-    "cv": "./bin/cv"
+    "cv": "./dist/main.js"
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm clean && tsc --project tsconfig.json",
     "dev": "tsx src/main.ts",
     "start": "node dist/main.js",
+    "typecheck:prod": "tsc --project tsconfig.json --noEmit",
+    "typecheck:test": "tsc --project tsconfig.test.json",
+    "typecheck": "pnpm typecheck:prod && pnpm typecheck:test",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
