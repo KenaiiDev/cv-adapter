@@ -86,7 +86,7 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - The correction creates profile and transaction files with protected permissions, preserves or tightens an existing safe mode without widening it, publishes backups from protected regular temporary files by atomic rename, and restores the prior backup when live replacement fails.
 - External temporary-directory harness evidence: `profileMode=600`, `backupMode=600`, backup symlink target untouched, published backup is regular, forced failure observed, live bytes preserved, prior backup bytes preserved, and no transaction files remained.
 - Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass.
-- Correction work-unit identity: `fix(profile): secure transactional profile replacement`; its assigned hash is reported with final delivery evidence because a commit cannot contain its own hash.
+- Correction work-unit commit: `5acba4fb196ae865088e9dd5f145d15c0374ef59` (`fix(profile): secure transactional profile replacement`).
 - Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
 
 ## Next Step
