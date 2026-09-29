@@ -50,12 +50,13 @@ program
   .command('profile')
   .description('View or edit the current profile')
   .option('--show', 'Show current profile')
-  .option('--edit', 'Edit profile in $EDITOR')
+  .option('--edit', 'Edit profile in $EDITOR through a staged file')
+  .option('--yes', 'Replace the profile without interactive confirmation')
   .action(async (opts) => {
     if (opts.show) {
       await showProfileCommand.execute();
     } else if (opts.edit) {
-      await editProfileCommand.execute();
+      await editProfileCommand.execute({ yes: opts.yes });
     } else {
       await showProfileCommand.execute();
     }

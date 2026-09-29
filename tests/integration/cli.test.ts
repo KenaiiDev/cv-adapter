@@ -60,4 +60,11 @@ describe('CLI process boundary', () => {
 
     expect(result.stdout).toContain('--yes');
   });
+
+  it('exposes explicit approval for staged manual profile edits', async () => {
+    const result = await runCli('profile', '--help');
+
+    expect(result.stdout).toContain('--edit');
+    expect(result.stdout).toContain('--yes');
+  });
 });

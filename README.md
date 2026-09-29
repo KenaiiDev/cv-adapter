@@ -120,13 +120,27 @@ pnpm dev -- update --pdf ~/cv/new_cv.pdf
 pnpm dev -- profile
 pnpm dev -- profile --show
 
-# Editar perfil manualmente (abre $EDITOR, default: nano)
+# Edit the profile manually through a staged file (opens $EDITOR, default: nano)
 pnpm dev -- profile --edit
 
 # Modo interactivo (menú) — alias: `i`
 pnpm dev -- interactive
 pnpm dev -- i
 ```
+
+### Safe profile updates and manual edits
+
+`update` and `profile --edit` never overwrite the live profile before validation and approval.
+Manual editing writes a protected staged copy, runs `$EDITOR` directly with the staged path as its sole argument, waits for it to exit, validates the resulting JSON, displays the deterministic field diff, and then asks whether to replace the live profile. Only an accepted edit calls the same safe replacement path used by PDF updates.
+
+Confirmation defaults to No. In a non-interactive session, replacement is refused unless `--yes` is passed:
+
+```bash
+pnpm dev -- update --pdf ~/cv/new_cv.pdf --yes
+pnpm dev -- profile --edit --yes
+```
+
+Set `EDITOR` to an editor executable, for example `export EDITOR=vim`. Editor arguments are not parsed; use an executable that waits for its editing session to close.
 
 ## Quick reference
 
@@ -138,7 +152,7 @@ pnpm dev -- i
 | `pnpm dev -- generate "<vacancy>"` | Generar CV adaptado a oferta |
 | `pnpm dev -- generate "<vacancy>" --lang <es\|en>` | Generar CV en idioma específico |
 | `pnpm dev -- profile` / `--show` | Ver perfil actual |
-| `pnpm dev -- profile --edit` | Editar perfil en `$EDITOR` |
+| `pnpm dev -- profile --edit` | Edit the staged profile in `$EDITOR` |
 | `pnpm dev -- interactive` (alias `i`) | Modo interactivo (menú) |
 | `pnpm build` | Compilar TypeScript a `dist/` |
 | `pnpm start -- <args>` | Ejecutar versión compilada (`node dist/main.js`) |

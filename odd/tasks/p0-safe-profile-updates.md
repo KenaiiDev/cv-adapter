@@ -57,12 +57,17 @@ The user explicitly authorized safe profile updates and selected the safe confir
   - Acceptance: parsing has no persistence side effect; malformed profiles are rejected; declined and failed updates preserve the live profile; confirmed updates create an exact backup and atomically replace the profile; initialization behavior remains supported.
   - Checks: focused domain, parser, repository, init, and update tests; typecheck; full tests; build; diff check.
   - Rollback: restore the previous parse/save path and repository API without touching package or editor behavior.
-- [ ] **P0-03-B — Stage manual edits and remove shell execution**
-  - Route: delegated writer.
+- [x] **P0-03-B — Stage manual edits and remove shell execution**
+  - Route: authorized bounded implementation writer.
   - Trigger: behavior spans temporary files, process execution, validation, diff/confirmation, repository replacement, CLI composition, tests, and README.
-  - Acceptance: the live profile is never edited directly; editor executable and file path bypass the shell; completion is awaited; invalid, failed, declined, or cancelled edits preserve the live profile; accepted edits use the safe replacement path.
-  - Checks: focused profile-command and process-adapter tests; runtime editor harness; typecheck; full tests; build; diff check.
-  - Rollback: remove staged editing while retaining safe PDF replacement.
+  - Acceptance: the live profile is never edited directly; editor executable and staged file path bypass the shell; completion is awaited; invalid, failed, declined, or cancelled edits preserve the live profile; accepted edits use the safe replacement path.
+  - Implementation: `EditProfileCommand` serializes the validated current profile to a `0600` staged file in a unique temporary directory, awaits `EditorProcess`, validates the edited JSON, uses the existing deterministic diff and confirmation contract, and calls `IProfileRepository.replace` only after acceptance. `EditorProcess` invokes the executable with `[stagedPath]` and `{ shell: false }`; staging is removed in all outcomes.
+  - Tests: focused profile command, process adapter, and CLI tests pass 15 tests. They cover awaited staging, direct argument-array process invocation, invalid JSON, editor failure, declined edits, non-TTY refusal, accepted replacement, and the `--yes` CLI option.
+  - Runtime evidence: the profile-command runtime harness launches `process.execPath` through the real `EditorProcess` against the staged profile and confirms completion before replacement; it passed in the focused suite.
+  - Checks: `pnpm exec vitest run tests/integration/commands/ProfileCommand.test.ts tests/unit/infrastructure/process/EditorProcess.test.ts tests/integration/cli.test.ts` (15 passed); `pnpm typecheck` (pass); `pnpm test` (191 passed); `pnpm build` (pass); `git diff --check` (pass).
+  - Commit: recorded in the final delivery after this tracker is committed as part of the single work unit.
+  - Risk result: no separate risk assessment was available; safe-replacement scope, package metadata/version, lockfile, packaging, remotes/network, and `.atl/` were not changed.
+  - Rollback: remove staged editing and the process adapter while retaining safe PDF replacement.
 - [ ] **P0-03-C — Verify and record delivery evidence**
   - Route: delegated verification according to native risk plus parent spot checks.
   - Acceptance: all applicable checks pass; `.atl/`, `pnpm-lock.yaml`, version, and unrelated behavior remain untouched; each completed work unit has a Conventional Commit identity and risk outcome.
@@ -71,7 +76,7 @@ The user explicitly authorized safe profile updates and selected the safe confir
 
 - Read-only mapping completed.
 - Confirmation contract selected: interactive No by default; non-TTY requires `--yes`.
-- P0-03-A implemented on `fix/p0-safe-profile-updates` as one cohesive safe-replacement work unit; P0-03-B has not started.
+- P0-03-A and P0-03-B are implemented on `fix/p0-safe-profile-updates` as separate safe-replacement and staged-editor work units.
 - Parsing now returns a validated candidate without persistence or direct output; initialization and update-without-profile persist explicitly.
 - Existing and candidate profiles receive structural runtime validation while retaining empty strings and arrays.
 - Existing-profile updates load current state, show deterministic leaf-path changes, default confirmation to No, refuse non-TTY replacement without `--yes`, and replace through exact rolling backup plus same-directory atomic rename.
@@ -94,7 +99,9 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - External cleanup-failure harness evidence: `resolved=true`, `candidateCommitted=true`, `backupCommitted=true`, one `.rollback` file remained, and that artifact retained the prior rolling-backup bytes.
 - Second correction work-unit identity: `fix(profile): keep committed replacement truthful after cleanup failure`; assigned hash is reported in final delivery evidence.
 - Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
+- P0-03-B completes staged manual editing: live profile bytes are never passed to the editor; only an accepted, structurally valid staged candidate reaches the established `replace()` transaction.
+- P0-03-B work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
 
 ## Next Step
 
-Implement P0-03-B as a separate work unit without weakening the safe replacement boundary completed in P0-03-A.
+Perform P0-03-C verification and record delivery evidence without weakening the safe replacement boundary completed in P0-03-A.
