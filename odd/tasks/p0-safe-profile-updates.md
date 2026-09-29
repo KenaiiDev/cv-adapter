@@ -87,6 +87,12 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - External temporary-directory harness evidence: `profileMode=600`, `backupMode=600`, backup symlink target untouched, published backup is regular, forced failure observed, live bytes preserved, prior backup bytes preserved, and no transaction files remained.
 - Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass.
 - Correction work-unit commit: `5acba4fb196ae865088e9dd5f145d15c0374ef59` (`fix(profile): secure transactional profile replacement`).
+- Second independent verification found one bounded false-failure: after candidate and backup renames had committed, failure removing the displaced `.rollback` artifact made `replace()` reject and falsely report update failure.
+- Second correction RED evidence: the focused test expected resolution but received `Error: rollback cleanup failed` after both committed files were already observable.
+- Second correction GREEN evidence: post-commit rollback cleanup is best-effort, `replace()` resolves truthfully, the candidate and exact backup remain committed, and an undeletable rollback artifact remains intact for later manual cleanup rather than being disguised as a failed update.
+- Second correction checks: repository suite passes 9 tests; full suite passes 188 tests; `pnpm typecheck`, `pnpm build`, and `git diff --check` pass.
+- External cleanup-failure harness evidence: `resolved=true`, `candidateCommitted=true`, `backupCommitted=true`, one `.rollback` file remained, and that artifact retained the prior rolling-backup bytes.
+- Second correction work-unit identity: `fix(profile): keep committed replacement truthful after cleanup failure`; assigned hash is reported in final delivery evidence.
 - Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
 
 ## Next Step

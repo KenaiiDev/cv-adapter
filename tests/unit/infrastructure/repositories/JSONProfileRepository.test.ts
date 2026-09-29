@@ -141,4 +141,30 @@ describe('JSONProfileRepository', () => {
       'profile.json.bak',
     ]);
   });
+
+  it('resolves truthfully when post-commit rollback cleanup fails', async () => {
+    const { profilePath, repository } = await createRepository();
+    const previousBytes = `${JSON.stringify(createEmptyProfile())}\n`;
+    const priorBackupBytes = 'prior rolling backup';
+    const candidate = { ...createEmptyProfile(), name: 'Updated User' };
+    await writeFile(profilePath, previousBytes, { mode: 0o600 });
+    await writeFile(`${profilePath}.bak`, priorBackupBytes, { mode: 0o600 });
+    const remove = fsPromises.rm.bind(fsPromises);
+    vi.spyOn(fsPromises, 'rm').mockImplementation((filePath, options) => {
+      if (filePath.toString().endsWith('.rollback')) {
+        return Promise.reject(new Error('rollback cleanup failed'));
+      }
+      return remove(filePath, options);
+    });
+
+    await expect(repository.replace(candidate)).resolves.toBeUndefined();
+
+    expect(await repository.load()).toEqual(candidate);
+    expect(await readFile(`${profilePath}.bak`, 'utf8')).toBe(previousBytes);
+    const rollbackFiles = (await readdir(path.dirname(profilePath)))
+      .filter(file => file.endsWith('.rollback'));
+    expect(rollbackFiles).toHaveLength(1);
+    expect(await readFile(path.join(path.dirname(profilePath), rollbackFiles[0]), 'utf8'))
+      .toBe(priorBackupBytes);
+  });
 });

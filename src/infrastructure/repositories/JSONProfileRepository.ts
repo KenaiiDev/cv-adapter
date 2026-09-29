@@ -78,7 +78,7 @@ export class JSONProfileRepository implements IProfileRepository {
       profileReplaced = true;
 
       if (previousBackupMoved) {
-        await fs.promises.rm(previousBackupPath, { force: true });
+        await fs.promises.rm(previousBackupPath, { force: true }).catch(() => undefined);
       }
     } catch (error) {
       if (!profileReplaced) {
