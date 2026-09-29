@@ -73,19 +73,14 @@ describe('ProfileCommand', () => {
 
   it('preserves the live profile when the editor fails', async () => {
     editor.execute.mockRejectedValue(new Error('editor failed'));
-    const exit = vi.fn();
-    vi.stubGlobal('process', { ...process, exit });
 
-    await command.execute();
+    await expect(command.execute()).rejects.toThrow('editor failed');
 
     expect(repository.replace).not.toHaveBeenCalled();
-    expect(exit).toHaveBeenCalledWith(1);
   });
 
   it('awaits a real editor process before replacing the staged candidate', async () => {
     vi.stubEnv('EDITOR', process.execPath);
-    const exit = vi.fn();
-    vi.stubGlobal('process', { ...process, exit });
     const runtimeCommand = new EditProfileCommand(
       join(temporaryDirectory, 'profile.json'),
       repository,
@@ -97,20 +92,16 @@ describe('ProfileCommand', () => {
     await runtimeCommand.execute();
 
     expect(repository.replace).toHaveBeenCalledWith(profile);
-    expect(exit).not.toHaveBeenCalled();
   });
 
   it('preserves the live profile when the edited JSON is invalid', async () => {
     editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
       await writeFile(stagedPath, '{');
     });
-    const exit = vi.fn();
-    vi.stubGlobal('process', { ...process, exit });
 
-    await command.execute();
+    await expect(command.execute()).rejects.toThrow();
 
     expect(repository.replace).not.toHaveBeenCalled();
-    expect(exit).toHaveBeenCalledWith(1);
   });
 
   it('preserves the live profile when the staged edit is declined', async () => {
@@ -130,14 +121,11 @@ describe('ProfileCommand', () => {
     editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
       await writeFile(stagedPath, JSON.stringify({ ...profile, name: 'Edited User' }));
     });
-    const exit = vi.fn();
-    vi.stubGlobal('process', { ...process, exit });
 
-    await command.execute();
+    await expect(command.execute()).rejects.toMatchObject({ code: 'UPDATE_CONFIRMATION_REQUIRED' });
 
     expect(repository.replace).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('UPDATE_CONFIRMATION_REQUIRED'));
-    expect(exit).toHaveBeenCalledWith(1);
   });
 
   it('shows an existing profile', async () => {

@@ -121,4 +121,8 @@ program
     }
   });
 
-await program.parseAsync();
+try {
+  await program.parseAsync();
+} catch {
+  process.exitCode = 1;
+}

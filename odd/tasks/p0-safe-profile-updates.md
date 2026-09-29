@@ -101,6 +101,11 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
 - P0-03-B completes staged manual editing: live profile bytes are never passed to the editor; only an accepted, structurally valid staged candidate reaches the established `replace()` transaction.
 - P0-03-B work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
+- P0-03-B bounded correction: `EditProfileCommand` now logs failure and rethrows so its `finally` removes staging; the CLI entry boundary records exit code `1` only after command completion.
+- Correction RED evidence: a child-process CLI harness ran a real failing editor against an isolated home directory; process exit code was `1` and `.profile-edit-*` remained, proving that the former in-command `process.exit(1)` bypassed cleanup.
+- Correction GREEN evidence: the same harness exits with code `1` and finds no `.profile-edit-*` entries. Focused profile command, editor process, and CLI suites pass 16 tests; full suite passes 192 tests.
+- Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass. Package metadata/version, `pnpm-lock.yaml`, packaging, remotes/network, dependencies, `.atl/`, and P0-03-C were not changed.
+- Correction work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
 
 ## Next Step
 

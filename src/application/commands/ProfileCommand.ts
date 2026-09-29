@@ -100,7 +100,7 @@ export class EditProfileCommand {
     } catch (error) {
       if (error instanceof DomainError) this.logger.error(error.toString());
       else this.logger.error('❌ Unexpected error:', error);
-      process.exit(1);
+      throw error;
     } finally {
       if (stagingDirectory) await rm(stagingDirectory, { recursive: true, force: true });
     }
