@@ -79,7 +79,15 @@ The user explicitly authorized safe profile updates and selected the safe confir
 - GREEN evidence: focused domain/parser/repository suites pass 30 tests; focused init/update suites pass 19 tests; the full suite passes 183 tests.
 - Verification: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass. Runtime harness `pnpm exec tsx src/main.ts update --help` exposes `--yes` without mutating profile state.
 - Review budget: this work unit exceeds 400 authored changed lines because validation, command orchestration, transactional persistence, CLI wiring, behavior tests, and tracker evidence form one rollback-safe replacement contract; splitting them would leave an unsafe intermediate update path.
-- Intended commit: `feat(profile): make PDF profile replacement safe`.
+- Initial P0-03-A commit: `b014284c5d11d31949089b8a96a5a2a1fbad54ad` (`feat(profile): make PDF profile replacement safe`).
+- Independent verification found three candidate-caused filesystem gaps: a pre-existing `0600` profile and its backup widened to `0644`, an existing backup symlink target was overwritten, and a failed live rename destroyed the prior rolling backup.
+- Bounded correction RED evidence: the mode test observed `0644` instead of `0600`; the symlink test observed its protected target overwritten; the forced live-rename test observed prior backup bytes replaced by current live bytes.
+- Bounded correction GREEN evidence: repository tests pass 8 tests; focused domain/parser/repository suites pass 34 tests; focused init/update/CLI suites pass 24 tests; the full suite passes 187 tests.
+- The correction creates profile and transaction files with protected permissions, preserves or tightens an existing safe mode without widening it, publishes backups from protected regular temporary files by atomic rename, and restores the prior backup when live replacement fails.
+- External temporary-directory harness evidence: `profileMode=600`, `backupMode=600`, backup symlink target untouched, published backup is regular, forced failure observed, live bytes preserved, prior backup bytes preserved, and no transaction files remained.
+- Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass.
+- Correction work-unit identity: `fix(profile): secure transactional profile replacement`; its assigned hash is reported with final delivery evidence because a commit cannot contain its own hash.
+- Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
 
 ## Next Step
 

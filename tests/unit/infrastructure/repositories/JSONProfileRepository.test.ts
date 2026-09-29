@@ -1,5 +1,5 @@
 import { promises as fsPromises } from 'node:fs';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -48,6 +48,14 @@ describe('JSONProfileRepository', () => {
     } satisfies Partial<DomainError>);
   });
 
+  it('creates initialized profiles with protected permissions', async () => {
+    const { profilePath, repository } = await createRepository();
+
+    await repository.save(createEmptyProfile());
+
+    expect((await stat(profilePath)).mode & 0o777).toBe(0o600);
+  });
+
   it('replaces the profile atomically and keeps an exact rolling backup', async () => {
     const { profilePath, repository } = await createRepository();
     const previousBytes = `${JSON.stringify(createEmptyProfile())}\n`;
@@ -64,6 +72,32 @@ describe('JSONProfileRepository', () => {
     ]);
   });
 
+  it('preserves a protected live mode without widening profile or backup access', async () => {
+    const { profilePath, repository } = await createRepository();
+    await writeFile(profilePath, JSON.stringify(createEmptyProfile()), 'utf8');
+    await chmod(profilePath, 0o600);
+
+    await repository.replace({ ...createEmptyProfile(), name: 'Updated User' });
+
+    expect((await stat(profilePath)).mode & 0o777).toBe(0o600);
+    expect((await stat(`${profilePath}.bak`)).mode & 0o777).toBe(0o600);
+  });
+
+  it('replaces an existing backup symlink without following its target', async () => {
+    const { profilePath, repository } = await createRepository();
+    const previousBytes = `${JSON.stringify(createEmptyProfile())}\n`;
+    const symlinkTarget = path.join(path.dirname(profilePath), 'protected-target');
+    await writeFile(profilePath, previousBytes, { mode: 0o600 });
+    await writeFile(symlinkTarget, 'do not overwrite', { mode: 0o600 });
+    await symlink(symlinkTarget, `${profilePath}.bak`);
+
+    await repository.replace({ ...createEmptyProfile(), name: 'Updated User' });
+
+    expect(await readFile(symlinkTarget, 'utf8')).toBe('do not overwrite');
+    expect((await lstat(`${profilePath}.bak`)).isFile()).toBe(true);
+    expect(await readFile(`${profilePath}.bak`, 'utf8')).toBe(previousBytes);
+  });
+
   it('preserves the original profile and cleans up when atomic rename fails', async () => {
     const { profilePath, repository } = await createRepository();
     const previousBytes = `${JSON.stringify(createEmptyProfile())}\n`;
@@ -76,6 +110,32 @@ describe('JSONProfileRepository', () => {
     })).rejects.toThrow('rename failed');
 
     expect(await readFile(profilePath, 'utf8')).toBe(previousBytes);
+    expect((await readdir(path.dirname(profilePath))).sort()).toEqual([
+      'profile.json',
+    ]);
+  });
+
+  it('preserves the prior rolling backup when live replacement fails', async () => {
+    const { profilePath, repository } = await createRepository();
+    const previousBytes = `${JSON.stringify(createEmptyProfile())}\n`;
+    const priorBackupBytes = 'prior rolling backup';
+    await writeFile(profilePath, previousBytes, { mode: 0o600 });
+    await writeFile(`${profilePath}.bak`, priorBackupBytes, { mode: 0o600 });
+    const rename = fsPromises.rename.bind(fsPromises);
+    vi.spyOn(fsPromises, 'rename').mockImplementation((source, destination) => {
+      if (destination === profilePath) {
+        return Promise.reject(new Error('live rename failed'));
+      }
+      return rename(source, destination);
+    });
+
+    await expect(repository.replace({
+      ...createEmptyProfile(),
+      name: 'Updated User',
+    })).rejects.toThrow('live rename failed');
+
+    expect(await readFile(profilePath, 'utf8')).toBe(previousBytes);
+    expect(await readFile(`${profilePath}.bak`, 'utf8')).toBe(priorBackupBytes);
     expect((await readdir(path.dirname(profilePath))).sort()).toEqual([
       'profile.json',
       'profile.json.bak',

@@ -6,6 +6,10 @@ import { validateProfile, type Profile } from '../../domain/entities/Profile.js'
 import type { IProfileRepository } from '../../interfaces/IProfileRepository.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 
+function hasErrorCode(error: unknown, code: string): boolean {
+  return error instanceof Error && 'code' in error && error.code === code;
+}
+
 export class JSONProfileRepository implements IProfileRepository {
   constructor(private readonly profilePath = JSONProfileRepository.defaultProfilePath()) {}
 
@@ -28,25 +32,69 @@ export class JSONProfileRepository implements IProfileRepository {
     const validProfile = validateProfile(profile);
     this.ensureDir();
     const filePath = this.getProfilePath();
-    await fs.promises.writeFile(filePath, JSON.stringify(validProfile, null, 2), 'utf-8');
+    await fs.promises.writeFile(filePath, JSON.stringify(validProfile, null, 2), {
+      encoding: 'utf8',
+      mode: 0o600,
+    });
+    await fs.promises.chmod(filePath, 0o600);
   }
 
   async replace(profile: Profile): Promise<void> {
     const validProfile = validateProfile(profile);
     const filePath = this.getProfilePath();
     const temporaryPath = `${filePath}.${randomUUID()}.tmp`;
+    const backupPath = `${filePath}.bak`;
+    const backupTemporaryPath = `${backupPath}.${randomUUID()}.tmp`;
+    const previousBackupPath = `${backupPath}.${randomUUID()}.rollback`;
     const previousBytes = await fs.promises.readFile(filePath);
+    const protectedMode = (await fs.promises.stat(filePath)).mode & 0o600;
+    let previousBackupMoved = false;
+    let backupPublished = false;
+    let profileReplaced = false;
 
     try {
       await fs.promises.writeFile(
         temporaryPath,
         JSON.stringify(validProfile, null, 2),
-        { encoding: 'utf8', flag: 'wx' },
+        { encoding: 'utf8', flag: 'wx', mode: 0o600 },
       );
-      await fs.promises.writeFile(`${filePath}.bak`, previousBytes);
+      await fs.promises.chmod(temporaryPath, protectedMode);
+      await fs.promises.writeFile(backupTemporaryPath, previousBytes, {
+        flag: 'wx',
+        mode: protectedMode,
+      });
+      await fs.promises.chmod(backupTemporaryPath, protectedMode);
+
+      try {
+        await fs.promises.rename(backupPath, previousBackupPath);
+        previousBackupMoved = true;
+      } catch (error) {
+        if (!hasErrorCode(error, 'ENOENT')) throw error;
+      }
+
+      await fs.promises.rename(backupTemporaryPath, backupPath);
+      backupPublished = true;
       await fs.promises.rename(temporaryPath, filePath);
+      profileReplaced = true;
+
+      if (previousBackupMoved) {
+        await fs.promises.rm(previousBackupPath, { force: true });
+      }
+    } catch (error) {
+      if (!profileReplaced) {
+        if (backupPublished) {
+          await fs.promises.rm(backupPath, { force: true });
+        }
+        if (previousBackupMoved) {
+          await fs.promises.rename(previousBackupPath, backupPath);
+        }
+      }
+      throw error;
     } finally {
-      await fs.promises.rm(temporaryPath, { force: true });
+      await Promise.all([
+        fs.promises.rm(temporaryPath, { force: true }),
+        fs.promises.rm(backupTemporaryPath, { force: true }),
+      ]);
     }
   }
 
