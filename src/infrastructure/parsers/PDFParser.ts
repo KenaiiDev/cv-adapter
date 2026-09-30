@@ -304,6 +304,17 @@ export class PDFParser implements IParser {
 
     let currentExp: Partial<Experience> | null = null;
     let descriptionBuffer = '';
+    const isExperienceCandidate = (value: string, maxLength: number): boolean => {
+      return value.length > 0 &&
+        value.length <= maxLength &&
+        !/^(?:[-*•])\s*/.test(value) &&
+        !/[.!?;:]$/.test(value) &&
+        !value.includes('@') &&
+        !value.startsWith('http') &&
+        !value.match(/^\+54/) &&
+        !findDateInfo(value) &&
+        !this.parseSectionHeader(value);
+    };
 
     for (let i = startIdx; i <= endIdx && i < lines.length; i++) {
       const line = lines[i];
@@ -329,15 +340,28 @@ export class PDFParser implements IParser {
         let company = '';
         let title = '';
 
-        const isCompanyKeyword = [...companyKeywordsEs, ...companyKeywordsEn].some(k => beforeDate.includes(k));
-        if (isCompanyKeyword || beforeDate.includes('Freelance')) {
-          company = beforeDate.replace(/[-–]\s*$/, '').trim();
-        } else if (beforeDate.length > 0 && beforeDate.length < 40) {
-          company = beforeDate;
+        const isStandaloneDate = !beforeDate && !afterDate;
+        const titleCandidate = i - 1 >= startIdx ? lines[i - 1].trim() : '';
+        const companyCandidate = i - 2 >= startIdx ? lines[i - 2].trim() : '';
+
+        if (isStandaloneDate &&
+          isExperienceCandidate(companyCandidate, 40) &&
+          isExperienceCandidate(titleCandidate, 60)) {
+          company = companyCandidate;
+          title = titleCandidate;
         }
 
-        if (afterDate.length > 0 && afterDate.length < 60) {
-          title = afterDate;
+        if (!isStandaloneDate) {
+          const isCompanyKeyword = [...companyKeywordsEs, ...companyKeywordsEn].some(k => beforeDate.includes(k));
+          if (isCompanyKeyword || beforeDate.includes('Freelance')) {
+            company = beforeDate.replace(/[-–]\s*$/, '').trim();
+          } else if (beforeDate.length > 0 && beforeDate.length < 40) {
+            company = beforeDate;
+          }
+
+          if (afterDate.length > 0 && afterDate.length < 60) {
+            title = afterDate;
+          }
         }
 
         currentExp = {
