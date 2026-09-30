@@ -4,13 +4,20 @@ import { ParseProfile } from '../services/ParseProfile.js';
 import type { Logger } from '../../interfaces/Logger.js';
 import { defaultLogger } from '../../interfaces/Logger.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
+import type { IProfileRepository } from '../../interfaces/IProfileRepository.js';
 
 export class InitCommand {
   private parseProfile: ParseProfile;
+  private repository: IProfileRepository;
   private logger: Logger;
 
-  constructor(parseProfile: ParseProfile, logger: Logger = defaultLogger) {
+  constructor(
+    parseProfile: ParseProfile,
+    repository: IProfileRepository,
+    logger: Logger = defaultLogger,
+  ) {
     this.parseProfile = parseProfile;
+    this.repository = repository;
     this.logger = logger;
   }
 
@@ -18,6 +25,7 @@ export class InitCommand {
     try {
       this.logger.log(`📄 Parsing PDF: ${pdfPath}`);
       const profile = await this.parseProfile.fromPDF(pdfPath, lang);
+      await this.repository.save(profile);
       this.logger.log(`\n✅ Profile initialized successfully!`);
     } catch (error) {
       if (error instanceof DomainError) {
@@ -33,8 +41,8 @@ export class InitCommand {
 export function createInitCommand(): InitCommand {
   const parser = new PDFParser();
   const repository = new JSONProfileRepository();
-  const parseProfile = new ParseProfile(parser, repository);
-  return new InitCommand(parseProfile, defaultLogger);
+  const parseProfile = new ParseProfile(parser);
+  return new InitCommand(parseProfile, repository, defaultLogger);
 }
 
 export const initCommand = createInitCommand();

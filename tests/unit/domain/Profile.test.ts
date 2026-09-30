@@ -1,7 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { createEmptyProfile, type Profile, type Contact, type Experience, type Education } from '../../../src/domain/entities/Profile.ts';
+import { createEmptyProfile, validateProfile, type Profile, type Contact, type Experience, type Education } from '../../../src/domain/entities/Profile.ts';
+import { DomainError } from '../../../src/domain/errors/DomainError.ts';
 
 describe('Profile', () => {
+  describe('validateProfile', () => {
+    it('accepts a structurally valid profile with empty strings and arrays', () => {
+      const profile = createEmptyProfile();
+
+      expect(validateProfile(profile)).toEqual(profile);
+    });
+
+    it('reports the path of malformed nested profile data', () => {
+      const profile = {
+        ...createEmptyProfile(),
+        experience: [{ title: 42 }],
+      };
+
+      expect(() => validateProfile(profile)).toThrowError(
+        expect.objectContaining<Partial<DomainError>>({
+          code: 'INVALID_PROFILE',
+          message: expect.stringContaining('experience.0.title'),
+        }),
+      );
+    });
+  });
+
   describe('createEmptyProfile', () => {
     it('should return Profile with empty name', () => {
       const profile = createEmptyProfile();

@@ -1,0 +1,120 @@
+# P0 Safe Profile Updates
+
+## Objective
+
+Ensure that importing or manually editing a profile cannot destroy a previously valid profile.
+
+## Problem and Why
+
+Profile parsing currently persists immediately, stored JSON is trusted without runtime validation, updates overwrite the live file directly, and manual editing executes `$EDITOR` through a shell against the live profile. Invalid data, interrupted writes, or editor failures can therefore corrupt or replace the user's only valid profile.
+
+## Scope
+
+- Separate profile parsing from persistence.
+- Validate profile structure at runtime when parsing, loading, and replacing profiles.
+- Show deterministic changes and confirm before replacing an existing profile.
+- Use a rolling backup and same-directory atomic replacement.
+- Stage manual edits outside the live profile and launch the editor without a shell.
+- Preserve initialization and update-without-profile behavior.
+- Document the confirmation and editor contracts.
+
+## Constraints
+
+- Preserve version `1.0.0`, package metadata, packaging behavior, and `pnpm-lock.yaml`.
+- Do not modify or stage `.atl/` or unrelated files.
+- Validation is structural: existing empty strings and arrays remain valid.
+- Interactive confirmation defaults to No; non-TTY updates refuse unless `--yes` is supplied.
+- Use one rolling `profile.json.bak`; timestamped history is out of scope.
+- Keep tests and documentation with the behavior they verify.
+
+## Authorized Scope
+
+The user explicitly authorized safe profile updates and selected the safe confirmation contract with an explicit `--yes` automation bypass.
+
+## Delivery
+
+- Strategy: `ask-on-risk`.
+- Chain strategy: `feature-branch-chain`, previously selected by the user.
+- Current branch: `fix/p0-safe-profile-updates`.
+- Parent branch/commit: `fix/p0-runnable-package-cli` at `6e12eec`.
+- Current review boundary: `6e12eec`.
+- Forecast: 480–690 authored changed lines across two cohesive work units.
+- Intended slices: safe PDF replacement first, safe staged editor second.
+- Push and pull-request creation remain separate user decisions.
+
+## TDD and Checks
+
+- Mode: enabled by the accepted RED/GREEN/REFACTOR remediation plan.
+- Runner: `pnpm exec vitest run` for focused tests; `pnpm test` for the full suite.
+- Use vertical RED → GREEN cycles, one observable behavior at a time.
+- Core checks: focused Vitest suites, `pnpm typecheck`, `pnpm test`, `pnpm build`, `git diff --check`, and CLI/runtime scenarios where applicable.
+
+## Tasks
+
+- [x] **P0-03-A — Make PDF profile replacement safe**
+  - Route: delegated writer.
+  - Trigger: implementation spans domain validation, application commands, repository persistence, CLI composition, and tests.
+  - Acceptance: parsing has no persistence side effect; malformed profiles are rejected; declined and failed updates preserve the live profile; confirmed updates create an exact backup and atomically replace the profile; initialization behavior remains supported.
+  - Checks: focused domain, parser, repository, init, and update tests; typecheck; full tests; build; diff check.
+  - Rollback: restore the previous parse/save path and repository API without touching package or editor behavior.
+- [x] **P0-03-B — Stage manual edits and remove shell execution**
+  - Route: authorized bounded implementation writer.
+  - Trigger: behavior spans temporary files, process execution, validation, diff/confirmation, repository replacement, CLI composition, tests, and README.
+  - Acceptance: the live profile is never edited directly; editor executable and staged file path bypass the shell; completion is awaited; invalid, failed, declined, or cancelled edits preserve the live profile; accepted edits use the safe replacement path.
+  - Implementation: `EditProfileCommand` serializes the validated current profile to a `0600` staged file in a unique temporary directory, awaits `EditorProcess`, validates the edited JSON, uses the existing deterministic diff and confirmation contract, and calls `IProfileRepository.replace` only after acceptance. `EditorProcess` invokes the executable with `[stagedPath]` and `{ shell: false }`; staging is removed in all outcomes.
+  - Tests: focused profile command, process adapter, and CLI tests pass 15 tests. They cover awaited staging, direct argument-array process invocation, invalid JSON, editor failure, declined edits, non-TTY refusal, accepted replacement, and the `--yes` CLI option.
+  - Runtime evidence: the profile-command runtime harness launches `process.execPath` through the real `EditorProcess` against the staged profile and confirms completion before replacement; it passed in the focused suite.
+  - Checks: `pnpm exec vitest run tests/integration/commands/ProfileCommand.test.ts tests/unit/infrastructure/process/EditorProcess.test.ts tests/integration/cli.test.ts` (15 passed); `pnpm typecheck` (pass); `pnpm test` (191 passed); `pnpm build` (pass); `git diff --check` (pass).
+  - Commit: recorded in the final delivery after this tracker is committed as part of the single work unit.
+  - Risk result: no separate risk assessment was available; safe-replacement scope, package metadata/version, lockfile, packaging, remotes/network, and `.atl/` were not changed.
+  - Rollback: remove staged editing and the process adapter while retaining safe PDF replacement.
+- [x] **P0-03-C — Verify and record delivery evidence**
+  - Route: delegated verification according to native risk plus parent spot checks.
+  - Acceptance: all applicable checks pass; `.atl/`, `pnpm-lock.yaml`, version, and unrelated behavior remain untouched; each completed work unit has a Conventional Commit identity and risk outcome.
+  - Final independent verification for `6e12eec..edfb883`: PASS. The real-failure CLI regression passed 7/7; the broader profile/editor/update/repository suite passed 30/30; typecheck passed; the full suite passed 192/192 across 16 files; and `git diff --check 6e12eec..edfb883` passed.
+  - Scope verification: `package.json` and `pnpm-lock.yaml` are unchanged across the range, version remains `1.0.0`, and `.atl/` is absent from the committed range.
+  - Work-unit identities: `458c0d6` (`feat(profile): stage manual profile edits safely`) and `edfb883` (`fix(profile): clean staged edits before failure exit`) are Conventional Commits.
+  - Risk outcome: RDD is disabled/unmanaged. No push or pull request was created.
+
+## Progress
+
+- Read-only mapping completed.
+- Confirmation contract selected: interactive No by default; non-TTY requires `--yes`.
+- P0-03-A and P0-03-B are implemented on `fix/p0-safe-profile-updates` as separate safe-replacement and staged-editor work units.
+- Parsing now returns a validated candidate without persistence or direct output; initialization and update-without-profile persist explicitly.
+- Existing and candidate profiles receive structural runtime validation while retaining empty strings and arrays.
+- Existing-profile updates load current state, show deterministic leaf-path changes, default confirmation to No, refuse non-TTY replacement without `--yes`, and replace through exact rolling backup plus same-directory atomic rename.
+- RED evidence: focused failures demonstrated the missing validator, parsing side effect, explicit init persistence, malformed-JSON boundary, replacement API, confirmation, complete array-entry paths, and CLI `--yes` option before each minimal implementation.
+- GREEN evidence: focused domain/parser/repository suites pass 30 tests; focused init/update suites pass 19 tests; the full suite passes 183 tests.
+- Verification: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass. Runtime harness `pnpm exec tsx src/main.ts update --help` exposes `--yes` without mutating profile state.
+- Review budget: this work unit exceeds 400 authored changed lines because validation, command orchestration, transactional persistence, CLI wiring, behavior tests, and tracker evidence form one rollback-safe replacement contract; splitting them would leave an unsafe intermediate update path.
+- Initial P0-03-A commit: `b014284c5d11d31949089b8a96a5a2a1fbad54ad` (`feat(profile): make PDF profile replacement safe`).
+- Independent verification found three candidate-caused filesystem gaps: a pre-existing `0600` profile and its backup widened to `0644`, an existing backup symlink target was overwritten, and a failed live rename destroyed the prior rolling backup.
+- Bounded correction RED evidence: the mode test observed `0644` instead of `0600`; the symlink test observed its protected target overwritten; the forced live-rename test observed prior backup bytes replaced by current live bytes.
+- Bounded correction GREEN evidence: repository tests pass 8 tests; focused domain/parser/repository suites pass 34 tests; focused init/update/CLI suites pass 24 tests; the full suite passes 187 tests.
+- The correction creates profile and transaction files with protected permissions, preserves or tightens an existing safe mode without widening it, publishes backups from protected regular temporary files by atomic rename, and restores the prior backup when live replacement fails.
+- External temporary-directory harness evidence: `profileMode=600`, `backupMode=600`, backup symlink target untouched, published backup is regular, forced failure observed, live bytes preserved, prior backup bytes preserved, and no transaction files remained.
+- Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass.
+- Correction work-unit commit: `5acba4fb196ae865088e9dd5f145d15c0374ef59` (`fix(profile): secure transactional profile replacement`).
+- Second independent verification found one bounded false-failure: after candidate and backup renames had committed, failure removing the displaced `.rollback` artifact made `replace()` reject and falsely report update failure.
+- Second correction RED evidence: the focused test expected resolution but received `Error: rollback cleanup failed` after both committed files were already observable.
+- Second correction GREEN evidence: post-commit rollback cleanup is best-effort, `replace()` resolves truthfully, the candidate and exact backup remain committed, and an undeletable rollback artifact remains intact for later manual cleanup rather than being disguised as a failed update.
+- Second correction checks: repository suite passes 9 tests; full suite passes 188 tests; `pnpm typecheck`, `pnpm build`, and `git diff --check` pass.
+- External cleanup-failure harness evidence: `resolved=true`, `candidateCommitted=true`, `backupCommitted=true`, one `.rollback` file remained, and that artifact retained the prior rolling-backup bytes.
+- Second correction work-unit identity: `fix(profile): keep committed replacement truthful after cleanup failure`; assigned hash is reported in final delivery evidence.
+- Residual follow-ups: durability `fsync` and concurrent-writer control remain explicitly outside this correction scope.
+- P0-03-B completes staged manual editing: live profile bytes are never passed to the editor; only an accepted, structurally valid staged candidate reaches the established `replace()` transaction.
+- P0-03-B work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
+- P0-03-B bounded correction: `EditProfileCommand` now logs failure and rethrows so its `finally` removes staging; the CLI entry boundary records exit code `1` only after command completion.
+- Correction RED evidence: a child-process CLI harness ran a real failing editor against an isolated home directory; process exit code was `1` and `.profile-edit-*` remained, proving that the former in-command `process.exit(1)` bypassed cleanup.
+- Correction GREEN evidence: the same harness exits with code `1` and finds no `.profile-edit-*` entries. Focused profile command, editor process, and CLI suites pass 16 tests; full suite passes 192 tests.
+- Correction checks: `pnpm typecheck`, `pnpm test`, `pnpm build`, and `git diff --check` pass. Package metadata/version, `pnpm-lock.yaml`, packaging, remotes/network, dependencies, `.atl/`, and P0-03-C were not changed.
+- Correction work-unit commit identity is recorded in final delivery because Git cannot embed a commit's own final hash in the committed tracker content.
+- P0-03-C independent verification for `6e12eec..edfb883`: PASS. The real-failure CLI regression passed 7/7; the broader profile/editor/update/repository suite passed 30/30; typecheck passed; the full suite passed 192/192 across 16 files; and the range diff check passed.
+- Range scope verification confirms `package.json`, version `1.0.0`, and `pnpm-lock.yaml` are unchanged; `.atl/` is absent from committed changes. Conventional work-unit commits are `458c0d6` and `edfb883`. RDD is disabled/unmanaged.
+- Master integration on 2026-09-29: merged `origin/master` at `403943a` into `fix/p0-safe-profile-updates` with one conflict in `tests/integration/commands/ProfileCommand.test.ts`. The conflict joined a legacy `child_process.exec` callback-mock test with the staged-editor command tests. The resolved test retains the staged-editor contract because `EditProfileCommand` now depends on `EditorProcess` (which invokes `spawn` with `shell: false`) rather than `exec`; the focused suite covers editor failure and the dedicated `EditorProcess` suite covers direct process failure.
+- Merge verification: `pnpm exec vitest run tests/integration/commands/ProfileCommand.test.ts tests/unit/infrastructure/process/EditorProcess.test.ts tests/integration/commands/UpdateCommand.test.ts tests/unit/infrastructure/repositories/JSONProfileRepository.test.ts` passed 30/30; `pnpm typecheck`, `pnpm test` (192/192), `pnpm build`, `git diff --check`, and `git diff --cached --check` passed. `pnpm install --frozen-lockfile` completed without lockfile changes.
+
+## Next Step
+
+User-controlled delivery only: decide whether to push or open a pull request; no push or pull request is authorized or performed.

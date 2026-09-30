@@ -30,7 +30,7 @@ describe('InitCommand', () => {
     mockParseProfile = mock<ParseProfile>();
     mockLogger = mock<Logger>();
 
-    command = new InitCommand(mockParseProfile, mockLogger);
+    command = new InitCommand(mockParseProfile, mockRepo, mockLogger);
   });
 
   it('should log parsing message and call parseProfile.fromPDF', async () => {
@@ -50,6 +50,14 @@ describe('InitCommand', () => {
     await command.execute('/path/to/cv.pdf');
 
     expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('✅ Profile initialized successfully'));
+  });
+
+  it('persists the validated candidate explicitly', async () => {
+    mockParseProfile.fromPDF.mockResolvedValue(mockProfile);
+
+    await command.execute('/path/to/cv.pdf');
+
+    expect(mockRepo.save).toHaveBeenCalledWith(mockProfile);
   });
 
   it('should use default language es when not specified', async () => {

@@ -1,160 +1,138 @@
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mock, type MockProxy } from 'vitest-mock-extended';
-import { exec, type ChildProcess, type ExecException } from 'child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { IProfileRepository } from '../../../src/interfaces/IProfileRepository.ts';
 import type { Logger } from '../../../src/interfaces/Logger.ts';
 import type { Profile } from '../../../src/domain/entities/Profile.ts';
-import { ShowProfileCommand, EditProfileCommand } from '../../../src/application/commands/ProfileCommand.ts';
-
-vi.mock('child_process', () => ({ exec: vi.fn() }));
-
-type EditorExec = (
-  command: string,
-  callback?: (error: ExecException | null, stdout: string, stderr: string) => void,
-) => ChildProcess;
+import type { UpdateConfirmation } from '../../../src/interfaces/UpdateConfirmation.ts';
+import type { EditorProcess } from '../../../src/infrastructure/process/EditorProcess.ts';
+import { EditorProcess as RuntimeEditorProcess } from '../../../src/infrastructure/process/EditorProcess.ts';
+import { EditProfileCommand, ShowProfileCommand } from '../../../src/application/commands/ProfileCommand.ts';
 
 describe('ProfileCommand', () => {
-  describe('ShowProfileCommand', () => {
-    let mockRepo: MockProxy<IProfileRepository>;
-    let mockLogger: MockProxy<Logger>;
-    let command: ShowProfileCommand;
+  const profile: Profile = {
+    name: 'Current User',
+    contact: { email: 'current@example.com' },
+    experience: [],
+    education: [],
+    skills: [],
+    languages: [],
+    updated_at: '2024-01-01',
+  };
+  let repository: MockProxy<IProfileRepository>;
+  let logger: MockProxy<Logger>;
+  let confirmation: MockProxy<UpdateConfirmation>;
+  let editor: MockProxy<EditorProcess>;
+  let temporaryDirectory: string;
+  let command: EditProfileCommand;
 
-    const mockProfile: Profile = {
-      name: 'John Doe',
-      contact: { email: 'john@example.com' },
-      summary: 'Experienced developer',
-      experience: [{
-        title: 'Developer',
-        company: 'Tech Co',
-        start_date: '2020',
-        end_date: '2021',
-        description: 'Built things',
-      }],
-      education: [{
-        degree: 'CS Degree',
-        institution: 'University',
-        year: '2019',
-      }],
-      skills: [{ category: 'Languages', items: ['JavaScript', 'TypeScript'] }],
-      languages: [{ language: 'English', level: 'Fluent' }],
-      updated_at: '2024-01-01',
-    };
-
-    beforeEach(() => {
-      mockRepo = mock<IProfileRepository>();
-      mockLogger = mock<Logger>();
-      command = new ShowProfileCommand(mockRepo, mockLogger);
-    });
-
-    it('should output profile JSON when profile exists', async () => {
-      mockRepo.load.mockResolvedValue(mockProfile);
-      mockLogger.log.mockImplementation(() => {});
-
-      await command.execute();
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('📋 Current Profile'));
-      expect(mockLogger.log).toHaveBeenCalledWith(JSON.stringify(mockProfile, null, 2));
-    });
-
-    it('should exit with error when profile not found', async () => {
-      mockRepo.load.mockResolvedValue(null);
-      mockLogger.error.mockImplementation(() => {});
-      mockLogger.log.mockImplementation(() => {});
-
-      const exitMock = vi.fn();
-      vi.stubGlobal('process', { ...process, exit: exitMock });
-
-      await command.execute();
-
-      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('No profile found'));
-      expect(exitMock).toHaveBeenCalledWith(1);
-    });
-
-    it('should format JSON with indentation', async () => {
-      mockRepo.load.mockResolvedValue(mockProfile);
-      mockLogger.log.mockImplementation(() => {});
-
-      await command.execute();
-
-      const jsonCall = mockLogger.log.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"name":')
-      );
-      expect(jsonCall).toBeDefined();
-    });
+  beforeEach(async () => {
+    repository = mock<IProfileRepository>();
+    logger = mock<Logger>();
+    confirmation = mock<UpdateConfirmation>();
+    editor = mock<EditorProcess>();
+    temporaryDirectory = await mkdtemp(join(tmpdir(), 'cv-adapter-profile-command-'));
+    repository.load.mockResolvedValue(profile);
+    confirmation.isInteractive.mockReturnValue(true);
+    confirmation.confirm.mockResolvedValue(true);
+    command = new EditProfileCommand(join(temporaryDirectory, 'profile.json'), repository, editor, logger, confirmation);
   });
 
-  describe('EditProfileCommand', () => {
-    let mockLogger: MockProxy<Logger>;
-    let command: EditProfileCommand;
+  afterEach(async () => {
+    vi.unstubAllGlobals();
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  });
 
-    beforeEach(() => {
-      vi.unstubAllGlobals();
-      mockLogger = mock<Logger>();
-      command = new EditProfileCommand('~/.cv-adapter/profile.json', mockLogger);
+  it('stages the live profile, awaits the editor, and replaces only the accepted candidate', async () => {
+    vi.stubEnv('EDITOR', 'nano');
+    const candidate = { ...profile, name: 'Edited User' };
+    let releaseEditor: (() => void) | undefined;
+    const editorFinished = new Promise<void>(resolve => { releaseEditor = resolve; });
+    editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
+      await writeFile(stagedPath, JSON.stringify(candidate));
+      await editorFinished;
     });
 
-    it('should print editor information', async () => {
-      mockLogger.log.mockImplementation(() => {});
+    const execution = command.execute();
+    await vi.waitFor(() => expect(editor.execute).toHaveBeenCalledOnce());
+    expect(repository.replace).not.toHaveBeenCalled();
+    releaseEditor?.();
+    await execution;
 
-      const execMock = vi.fn();
-      vi.stubGlobal('process', { ...process, exec: execMock });
+    const stagedPath = editor.execute.mock.calls[0][1][0];
+    await expect(readFile(stagedPath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(editor.execute).toHaveBeenCalledWith('nano', [stagedPath]);
+    expect(repository.replace).toHaveBeenCalledWith(candidate);
+    expect(logger.log).toHaveBeenCalledWith([
+      'Profile changes:',
+      '- name: "Current User" -> "Edited User"',
+    ].join('\n'));
+  });
 
-      await command.execute();
+  it('preserves the live profile when the editor fails', async () => {
+    editor.execute.mockRejectedValue(new Error('editor failed'));
 
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('📝 Opening profile in'));
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('Path:'));
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('.cv-adapter/profile.json'));
+    await expect(command.execute()).rejects.toThrow('editor failed');
+
+    expect(repository.replace).not.toHaveBeenCalled();
+  });
+
+  it('awaits a real editor process before replacing the staged candidate', async () => {
+    vi.stubEnv('EDITOR', process.execPath);
+    const runtimeCommand = new EditProfileCommand(
+      join(temporaryDirectory, 'profile.json'),
+      repository,
+      new RuntimeEditorProcess(),
+      logger,
+      confirmation,
+    );
+
+    await runtimeCommand.execute();
+
+    expect(repository.replace).toHaveBeenCalledWith(profile);
+  });
+
+  it('preserves the live profile when the edited JSON is invalid', async () => {
+    editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
+      await writeFile(stagedPath, '{');
     });
 
-    it('should use default editor nano when EDITOR env not set', async () => {
-      mockLogger.log.mockImplementation(() => {});
+    await expect(command.execute()).rejects.toThrow();
 
-      const execMock = vi.fn();
-      vi.stubGlobal('process', { ...process, exec: execMock, env: {} });
+    expect(repository.replace).not.toHaveBeenCalled();
+  });
 
-      await command.execute();
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('nano'));
+  it('preserves the live profile when the staged edit is declined', async () => {
+    confirmation.confirm.mockResolvedValue(false);
+    editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
+      await writeFile(stagedPath, JSON.stringify({ ...profile, name: 'Edited User' }));
     });
 
-    it('should use custom EDITOR when set in env', async () => {
-      mockLogger.log.mockImplementation(() => {});
+    await command.execute();
 
-      const execMock = vi.fn();
-      vi.stubGlobal('process', { ...process, exec: execMock, env: { EDITOR: 'vim' } });
+    expect(repository.replace).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith('Profile update cancelled.');
+  });
 
-      await command.execute();
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('vim'));
+  it('refuses non-interactive staged replacement without --yes', async () => {
+    confirmation.isInteractive.mockReturnValue(false);
+    editor.execute.mockImplementation(async (_executable, [stagedPath]) => {
+      await writeFile(stagedPath, JSON.stringify({ ...profile, name: 'Edited User' }));
     });
 
-    it('should exit with error when editor fails', async () => {
-      mockLogger.log.mockImplementation(() => {});
-      mockLogger.error.mockImplementation(() => {});
+    await expect(command.execute()).rejects.toMatchObject({ code: 'UPDATE_CONFIRMATION_REQUIRED' });
 
-      const execMock = vi.mocked(exec) as unknown as Mock<EditorExec>;
-      const editorFailure = new Error('Editor not found');
-      let reportEditorFailure: () => void;
-      const editorFailureReported = new Promise<void>(resolve => {
-        reportEditorFailure = resolve;
-      });
-      execMock.mockImplementation((_command, callback) => {
-        queueMicrotask(() => {
-          callback?.(editorFailure, '', '');
-          reportEditorFailure();
-        });
-        return undefined as unknown as ChildProcess;
-      });
+    expect(repository.replace).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('UPDATE_CONFIRMATION_REQUIRED'));
+  });
 
-      const exitMock = vi.fn();
-      vi.stubGlobal('process', { ...process, env: { ...process.env, EDITOR: 'nano' }, exit: exitMock });
+  it('shows an existing profile', async () => {
+    const show = new ShowProfileCommand(repository, logger);
 
-      await command.execute();
-      await editorFailureReported;
+    await show.execute();
 
-      expect(execMock).toHaveBeenCalledWith('nano ~/.cv-adapter/profile.json', expect.any(Function));
-      expect(mockLogger.error).toHaveBeenCalled();
-      expect(exitMock).toHaveBeenCalledWith(1);
-    });
+    expect(logger.log).toHaveBeenCalledWith(JSON.stringify(profile, null, 2));
   });
 });

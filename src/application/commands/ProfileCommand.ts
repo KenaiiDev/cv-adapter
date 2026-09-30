@@ -3,8 +3,18 @@ import type { Logger } from '../../interfaces/Logger.js';
 import { defaultLogger } from '../../interfaces/Logger.js';
 import { DomainError } from '../../domain/errors/DomainError.js';
 import { JSONProfileRepository } from '../../infrastructure/repositories/JSONProfileRepository.js';
+import { EditorProcess } from '../../infrastructure/process/EditorProcess.js';
+import { InquirerUpdateConfirmation } from '../../infrastructure/confirmation/InquirerUpdateConfirmation.js';
+import { createProfileDiff, formatProfileDiff } from '../services/ProfileDiff.js';
+import { validateProfile } from '../../domain/entities/Profile.js';
+import type { UpdateConfirmation } from '../../interfaces/UpdateConfirmation.js';
 import * as os from 'os';
 import * as path from 'path';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+
+export interface EditProfileOptions {
+  yes?: boolean;
+}
 
 export class ShowProfileCommand {
   private repository: IProfileRepository;
@@ -40,27 +50,60 @@ export class ShowProfileCommand {
 }
 
 export class EditProfileCommand {
-  private profilePath: string;
-  private logger: Logger;
+  constructor(
+    private readonly profilePath: string,
+    private readonly repository: IProfileRepository,
+    private readonly editorProcess: EditorProcess,
+    private readonly logger: Logger = defaultLogger,
+    private readonly confirmation: UpdateConfirmation = new InquirerUpdateConfirmation(),
+  ) {}
 
-  constructor(profilePath: string = '~/.cv-adapter/profile.json', logger: Logger = defaultLogger) {
-    this.profilePath = profilePath;
-    this.logger = logger;
-  }
-
-  async execute(): Promise<void> {
+  async execute(options: EditProfileOptions = {}): Promise<void> {
     const editor = process.env.EDITOR || 'nano';
-    this.logger.log(`📝 Opening profile in ${editor}...`);
-    this.logger.log(`   Path: ${this.profilePath}`);
-    this.logger.log('   Save and close the editor to update.');
-
-    const { exec } = await import('child_process');
-    exec(`${editor} ${this.profilePath}`, (error) => {
-      if (error) {
-        this.logger.error('❌ Error opening editor:', error);
-        process.exit(1);
+    let stagingDirectory: string | undefined;
+    try {
+      const currentProfile = await this.repository.load();
+      if (!currentProfile) {
+        throw new DomainError(
+          'No profile found. Run "cv init --pdf <path>" first.',
+          'PROFILE_NOT_FOUND',
+          'Run: cv init --pdf ~/path/to/your/cv.pdf',
+        );
       }
-    });
+
+      stagingDirectory = await mkdtemp(path.join(path.dirname(this.profilePath), '.profile-edit-'));
+      const stagedPath = path.join(stagingDirectory, 'profile.json');
+      await writeFile(stagedPath, JSON.stringify(currentProfile, null, 2), {
+        encoding: 'utf8', flag: 'wx', mode: 0o600,
+      });
+      this.logger.log(`📝 Opening staged profile in ${editor}...`);
+      this.logger.log('   Save and close the editor to review changes.');
+      await this.editorProcess.execute(editor, [stagedPath]);
+
+      const candidate = validateProfile(JSON.parse(await readFile(stagedPath, 'utf8')));
+      this.logger.log(formatProfileDiff(createProfileDiff(currentProfile, candidate)));
+      if (!options.yes) {
+        if (!this.confirmation.isInteractive()) {
+          throw new DomainError(
+            'Profile update requires confirmation in a non-interactive session',
+            'UPDATE_CONFIRMATION_REQUIRED',
+            'Run the edit again with --yes to approve replacement',
+          );
+        }
+        if (!await this.confirmation.confirm('Replace the current profile?')) {
+          this.logger.log('Profile update cancelled.');
+          return;
+        }
+      }
+      await this.repository.replace(candidate);
+      this.logger.log('\n✅ Profile updated successfully!');
+    } catch (error) {
+      if (error instanceof DomainError) this.logger.error(error.toString());
+      else this.logger.error('❌ Unexpected error:', error);
+      throw error;
+    } finally {
+      if (stagingDirectory) await rm(stagingDirectory, { recursive: true, force: true });
+    }
   }
 }
 
@@ -71,7 +114,13 @@ export function createShowProfileCommand(): ShowProfileCommand {
 export function createEditProfileCommand(): EditProfileCommand {
   const home = os.homedir();
   const profilePath = path.join(home, '.cv-adapter', 'profile.json');
-  return new EditProfileCommand(profilePath, defaultLogger);
+  return new EditProfileCommand(
+    profilePath,
+    new JSONProfileRepository(profilePath),
+    new EditorProcess(),
+    defaultLogger,
+    new InquirerUpdateConfirmation(),
+  );
 }
 
 export const showProfileCommand = createShowProfileCommand();

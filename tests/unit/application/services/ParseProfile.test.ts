@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mock, type MockProxy } from 'vitest-mock-extended';
 import type { IParser } from '../../../../src/interfaces/IParser.ts';
-import type { IProfileRepository } from '../../../../src/interfaces/IProfileRepository.ts';
 import type { Profile } from '../../../../src/domain/entities/Profile.ts';
 import { ParseProfile } from '../../../../src/application/services/ParseProfile.ts';
 import * as fs from 'fs';
+import { DomainError } from '../../../../src/domain/errors/DomainError.ts';
 
 vi.mock('fs', () => ({
   existsSync: vi.fn(),
@@ -12,7 +12,6 @@ vi.mock('fs', () => ({
 
 describe('ParseProfile', () => {
   let mockParser: MockProxy<IParser>;
-  let mockRepo: MockProxy<IProfileRepository>;
   let parseProfile: ParseProfile;
 
   const mockProfile: Profile = {
@@ -38,8 +37,7 @@ describe('ParseProfile', () => {
 
   beforeEach(() => {
     mockParser = mock<IParser>();
-    mockRepo = mock<IProfileRepository>();
-    parseProfile = new ParseProfile(mockParser, mockRepo);
+    parseProfile = new ParseProfile(mockParser);
     vi.mocked(fs.existsSync).mockReturnValue(true);
   });
 
@@ -53,31 +51,48 @@ describe('ParseProfile', () => {
     it('should call parser.parse with correct file path', async () => {
       mockParser.parse.mockResolvedValue('John Doe\nemail@example.com');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
       await parseProfile.fromPDF('/path/to/cv.pdf');
 
       expect(mockParser.parse).toHaveBeenCalledWith('/path/to/cv.pdf');
     });
 
-    it('should call repository.save with parsed profile', async () => {
+    it('returns a candidate without persisting it', async () => {
       mockParser.parse.mockResolvedValue('John Doe\njohn@example.com');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
-      await parseProfile.fromPDF('/path/to/cv.pdf');
+      const result = await parseProfile.fromPDF('/path/to/cv.pdf');
 
-      expect(mockRepo.save).toHaveBeenCalled();
+      expect(result).toEqual(mockProfile);
     });
 
     it('should return parsed profile', async () => {
       mockParser.parse.mockResolvedValue('John Doe\njohn@example.com');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
       const result = await parseProfile.fromPDF('/path/to/cv.pdf');
 
       expect(result.name).toBe('John Doe');
+    });
+
+    it('rejects a structurally invalid parser candidate with a domain error', async () => {
+      mockParser.parse.mockResolvedValue('John Doe');
+      mockParser.toProfile.mockReturnValue({ name: 'John Doe' } as Profile);
+
+      await expect(parseProfile.fromPDF('/path/to/cv.pdf')).rejects.toMatchObject({
+        code: 'INVALID_PROFILE',
+      } satisfies Partial<DomainError>);
+    });
+
+    it('does not write directly to stdout', async () => {
+      mockParser.parse.mockResolvedValue('John Doe');
+      mockParser.toProfile.mockReturnValue(mockProfile);
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+      await parseProfile.fromPDF('/path/to/cv.pdf');
+
+      expect(consoleSpy).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
   });
 
@@ -85,7 +100,6 @@ describe('ParseProfile', () => {
     it('should extract name from first line if no email or http', async () => {
       mockParser.parse.mockResolvedValue('John Doe\nDeveloper\n2020 - 2021');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
       await parseProfile.fromPDF('/path/to/cv.pdf');
 
@@ -98,7 +112,6 @@ describe('ParseProfile', () => {
     it('should extract name from second line if first contains email', async () => {
       mockParser.parse.mockResolvedValue('john@example.com\nJohn Doe\nDeveloper');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
       await parseProfile.fromPDF('/path/to/cv.pdf');
 
@@ -111,7 +124,6 @@ describe('ParseProfile', () => {
     it('should extract name from second line if first contains http', async () => {
       mockParser.parse.mockResolvedValue('https://linkedin.com/in/john\nJohn Doe\nDeveloper');
       mockParser.toProfile.mockReturnValue(mockProfile);
-      mockRepo.save.mockResolvedValue();
 
       await parseProfile.fromPDF('/path/to/cv.pdf');
 
@@ -124,7 +136,6 @@ describe('ParseProfile', () => {
     it('should return Unknown if text is empty', async () => {
       mockParser.parse.mockResolvedValue('');
       mockParser.toProfile.mockReturnValue({ ...mockProfile, name: 'Unknown' });
-      mockRepo.save.mockResolvedValue();
 
       await parseProfile.fromPDF('/path/to/cv.pdf');
 
