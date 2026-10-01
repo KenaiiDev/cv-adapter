@@ -41,9 +41,9 @@ Reject AI-generated CV responses when `summary` or an `experience[].description`
 
 ## Route Evidence
 
-- **Chosen route:** direct local implementation in the AI response schema and its focused unit tests.
-- **Delegation:** none.
-- **Trigger evidence:** the authorized work unit explicitly identifies `src/infrastructure/ai/schemas.ts` and `tests/unit/infrastructure/ai/schemas.test.ts` as the expected bounded change surface and prohibits preview work. The change is a local schema invariant with no external dependency or remote operation.
+- **Chosen route:** delegated implementation to a writer for the AI response schema and its focused unit tests.
+- **Delegation:** a writer implemented the bounded change across `src/infrastructure/ai/schemas.ts` and `tests/unit/infrastructure/ai/schemas.test.ts`; task coordination and verification remained with the delegating agent.
+- **Trigger evidence:** the authorized work unit explicitly identifies `src/infrastructure/ai/schemas.ts` and `tests/unit/infrastructure/ai/schemas.test.ts` as two non-trivial files in the expected bounded change surface and prohibits preview work. That two-file implementation scope triggered delegation to a writer; no external dependency or remote operation was involved.
 
 ## Verification Log
 
