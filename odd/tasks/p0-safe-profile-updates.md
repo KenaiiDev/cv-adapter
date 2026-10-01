@@ -35,12 +35,12 @@ The user explicitly authorized safe profile updates and selected the safe confir
 
 - Strategy: `ask-on-risk`.
 - Chain strategy: `feature-branch-chain`, previously selected by the user.
-- Current branch: `fix/p0-safe-profile-updates`.
-- Parent branch/commit: `fix/p0-runnable-package-cli` at `6e12eec`.
-- Current review boundary: `6e12eec`.
+- Parent delivery PR #4 merged into `master` at `403943a`.
+- Safe-profile delivery PR #2 merged into `master` at `978f4479e3510bf4797489a5e822c92a0f80579a`.
+- PR #2 head `ea7558a50c5472b1c64183387beaa2fb4ca24625` passed GitHub Actions CI before merge.
 - Forecast: 480–690 authored changed lines across two cohesive work units.
 - Intended slices: safe PDF replacement first, safe staged editor second.
-- Push and pull-request creation remain separate user decisions.
+- Delivery decisions are complete for both intended slices.
 
 ## TDD and Checks
 
@@ -74,7 +74,7 @@ The user explicitly authorized safe profile updates and selected the safe confir
   - Final independent verification for `6e12eec..edfb883`: PASS. The real-failure CLI regression passed 7/7; the broader profile/editor/update/repository suite passed 30/30; typecheck passed; the full suite passed 192/192 across 16 files; and `git diff --check 6e12eec..edfb883` passed.
   - Scope verification: `package.json` and `pnpm-lock.yaml` are unchanged across the range, version remains `1.0.0`, and `.atl/` is absent from the committed range.
   - Work-unit identities: `458c0d6` (`feat(profile): stage manual profile edits safely`) and `edfb883` (`fix(profile): clean staged edits before failure exit`) are Conventional Commits.
-  - Risk outcome: RDD is disabled/unmanaged. No push or pull request was created.
+  - Risk outcome: RDD is disabled/unmanaged. Delivery completed through PR #2 after GitHub Actions CI passed.
 
 ## Progress
 
@@ -117,4 +117,4 @@ The user explicitly authorized safe profile updates and selected the safe confir
 
 ## Next Step
 
-User-controlled delivery only: decide whether to push or open a pull request; no push or pull request is authorized or performed.
+Delivery is complete. No further implementation or pull-request action is pending for this feature.
