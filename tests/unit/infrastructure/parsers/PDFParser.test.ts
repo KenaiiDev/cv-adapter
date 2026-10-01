@@ -235,6 +235,28 @@ Dev
       expect(profile.experience.length).toBeGreaterThan(0);
     });
 
+    it('should preserve company and title before a standalone date range', () => {
+      const cvWithStandaloneDate = `
+EXPERIENCIA PROFESIONAL
+Acme Corp
+Senior Backend Engineer
+Jan 2022 – Present
+- Built reliable APIs
+      `.trim();
+
+      const profile = parser.toProfile(cvWithStandaloneDate, 'Test User');
+
+      expect(profile.experience).toEqual([
+        {
+          company: 'Acme Corp',
+          title: 'Senior Backend Engineer',
+          start_date: 'Jan 2022',
+          end_date: 'Actual',
+          description: 'Built reliable APIs',
+        },
+      ]);
+    });
+
     it('should handle CV without education section', () => {
       const cvNoEducation = `
 Dev Name
