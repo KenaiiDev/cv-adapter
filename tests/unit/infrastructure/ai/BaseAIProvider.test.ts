@@ -137,6 +137,34 @@ describe('BaseAIProvider', () => {
       expect(result.skills).toEqual(profile.skills);
       expect(provider.callAPICalls).toHaveLength(1);
     });
+
+    it('should ignore AI-invented skills and retain the canonical profile skills', async () => {
+      const provider = new TestProvider(['raw'], [{
+        summary: 'Tailored summary from AI',
+        experience: [],
+        skills: [{ category: 'Invented', items: ['Fabricated Skill'] }],
+      }]);
+
+      const result = await provider.generateCV(profile, 'vacancy', 'es');
+
+      expect(result.skills).toEqual(profile.skills);
+    });
+
+    it('should retry when an experience reference is outside the profile', async () => {
+      const provider = new TestProvider(['raw1', 'raw2'], [
+        {
+          summary: 'Tailored summary from AI',
+          experience: [{ profile_index: 99, description: 'Invented experience' }],
+        },
+        createAIResponse(),
+      ]);
+
+      const result = await provider.generateCV(profile, 'vacancy', 'es');
+
+      expect(result.experience[0].description).toBe('Tailored first experience description');
+      expect(provider.callAPICalls).toHaveLength(2);
+      expect(provider.buildPromptCalls[1].previousError).toContain('profile_index');
+    });
   });
 
   describe('retry behavior', () => {

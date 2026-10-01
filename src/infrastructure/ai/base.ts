@@ -29,7 +29,13 @@ export abstract class BaseAIProvider implements IAIProvider {
 
       const result = CVDataSchema.safeParse(raw);
       if (result.success) {
-        return this.complete(result.data, profile);
+        const referenceError = this.validateExperienceReferences(result.data, profile);
+        if (!referenceError) {
+          return this.complete(result.data, profile);
+        }
+
+        lastError = referenceError;
+        continue;
       }
 
       lastError = formatZodError(result.error);
@@ -60,6 +66,16 @@ export abstract class BaseAIProvider implements IAIProvider {
       languages: profile.languages,
       generated_at: new Date().toISOString(),
     };
+  }
+
+  private validateExperienceReferences(cvData: AIResponse, profile: Profile): string | undefined {
+    const invalidReference = cvData.experience.find(
+      experience => experience.profile_index >= profile.experience.length
+    );
+
+    if (!invalidReference) return undefined;
+
+    return `- path experience: profile_index ${invalidReference.profile_index} does not reference a profile experience`;
   }
 
   protected abstract callAPI(prompt: string): Promise<string>;

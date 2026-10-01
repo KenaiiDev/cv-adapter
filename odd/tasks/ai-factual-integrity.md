@@ -47,7 +47,7 @@ The user explicitly authorized implementation after confirming the factual-integ
   - Acceptance: model output cannot override canonical identity, contact, experience facts, or education; output is assembled from `Profile` plus only approved AI-tailored content.
   - Checks: focused provider/schema tests; typecheck; full tests; build; diff check.
   - Rollback: restore the previous provider response contract and assembly path.
-- [ ] **P1-01-B — Validate profile references and factual regressions**
+- [x] **P1-01-B — Validate profile references and factual regressions**
   - Route: delegated writer.
   - Trigger: validation behavior and adversarial regression tests span provider contracts and test fixtures.
   - Acceptance: unknown experience references and non-profile skills are rejected or ignored according to the explicit contract; regression tests cover attempted factual alteration and invention.
@@ -65,7 +65,13 @@ The user explicitly authorized implementation after confirming the factual-integ
 - REFACTOR: reviewed the constrained boundary; retained a single profile-index-to-description map in `BaseAIProvider` and no additional abstraction was warranted.
 - Checks: `pnpm typecheck` passed; `pnpm test` passed (16 files, 184 tests); `pnpm build` passed; `git diff --check` passed.
 - P1-01-A task commit: `HEAD` — `feat(ai): preserve profile facts in CV generation`.
+- P1-01-B contract: an experience `profile_index` must reference an existing profile experience; an invalid reference rejects the attempt and uses the existing retry path. AI-provided skill fields are outside the constrained contract, are ignored by the schema, and canonical profile skills are retained.
+- RED: `pnpm exec vitest run tests/unit/infrastructure/ai/BaseAIProvider.test.ts` observed 1 failing test because profile index `99` was silently ignored instead of retried.
+- GREEN: `pnpm exec vitest run tests/unit/infrastructure/ai/BaseAIProvider.test.ts tests/unit/infrastructure/ai/schemas.test.ts` observed 2 passing files and 18 passing tests.
+- REFACTOR: reviewed the profile-aware bounds check; retained it in `BaseAIProvider` because only the provider has the canonical `Profile`, and no extra abstraction was warranted.
+- P1-01-B checks: `pnpm typecheck` passed; `pnpm test` passed (16 files, 186 tests); `pnpm build` passed; `git diff --check` passed.
+- P1-01-B task commit: `HEAD` — `fix(ai): validate generated CV references`.
 
 ## Next Step
 
-Implement P1-01-B only after separate authorization/work-unit handoff.
+Continue with the next authorized factual-integrity task.
