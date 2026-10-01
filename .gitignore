@@ -7,3 +7,5 @@ coverage/
 .DS_Store
 *.pdf
 bin/cv
+.atl/
+.worktrees/
