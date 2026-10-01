@@ -9,6 +9,10 @@ export class InquirerGeneratedCVReview implements GeneratedCVReview {
   }
 
   async review(cvData: CVData): Promise<boolean> {
+    if (!this.isInteractive()) {
+      return false;
+    }
+
     console.log(`\n${formatCVPreview(cvData)}\n`);
     const answer = await inquirer.prompt<{ approved: boolean }>([
       {
