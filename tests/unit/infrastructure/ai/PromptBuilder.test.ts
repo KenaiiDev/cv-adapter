@@ -50,8 +50,8 @@ describe('PromptBuilder', () => {
       const profile = createMockProfile();
       const prompt = builder.build(profile, 'vacancy', 'es', { currentDate: '2026-06-16' });
 
-      expect(prompt).toContain('use this date to calculate the duration of the role in years');
-      expect(prompt).toContain('Aggregate total years of experience');
+      expect(prompt).toContain('Use profile dates only to calculate experience duration');
+      expect(prompt).toContain('do not invent dates or factual claims');
     });
 
     it('should include the flat-JSON rule', () => {
@@ -62,11 +62,12 @@ describe('PromptBuilder', () => {
       expect(prompt).toContain('Never return markdown tables');
     });
 
-    it('should include the Actual date normalization rule', () => {
+    it('should constrain AI output to tailored narrative fields', () => {
       const profile = createMockProfile();
       const prompt = builder.build(profile, 'vacancy', 'es', { currentDate: '2026-01-01' });
 
-      expect(prompt).toContain('keep the string as "Actual" in the output');
+      expect(prompt).toContain('Tailor only the summary and experience descriptions');
+      expect(prompt).toContain('zero-based profile_index');
     });
 
     it('should NOT include feedback section when previousError is undefined', () => {
@@ -95,9 +96,8 @@ describe('PromptBuilder', () => {
       const prompt = builder.build(profile, 'vacancy', 'es', { currentDate: '2026-01-01' });
 
       expect(prompt).toContain('"experience"');
-      expect(prompt).toContain('"education"');
-      expect(prompt).toContain('"skills"');
-      expect(prompt).toContain('"languages"');
+      expect(prompt).toContain('"profile_index"');
+      expect(prompt).not.toContain('"education": [{');
     });
   });
 });

@@ -3,8 +3,15 @@ import { BaseAIProvider } from '../../../../src/infrastructure/ai/base.ts';
 import type { Profile } from '../../../../src/domain/entities/Profile.ts';
 import type { CVData } from '../../../../src/domain/entities/CVData.ts';
 import type { Language } from '../../../../src/interfaces/IAIProvider.ts';
-import { createMockCVData, createMockProfile } from '../../../helpers/mockData.ts';
+import { createMockProfile } from '../../../helpers/mockData.ts';
 import { DomainError } from '../../../../src/domain/errors/DomainError.ts';
+
+function createAIResponse() {
+  return {
+    summary: 'Tailored summary from AI',
+    experience: [{ profile_index: 0, description: 'Tailored first experience description' }],
+  };
+}
 
 class TestProvider extends BaseAIProvider {
   public callAPICalls: string[] = [];
@@ -72,9 +79,7 @@ describe('BaseAIProvider', () => {
 
   describe('happy path', () => {
     it('should return CVData on first valid attempt without retry', async () => {
-      const validResponse = createMockCVData();
-      const { generated_at, ...aiResponse } = validResponse;
-      const provider = new TestProvider(['raw'], [aiResponse]);
+      const provider = new TestProvider(['raw'], [createAIResponse()]);
 
       const result = await provider.generateCV(profile, 'Senior Python Developer', 'es');
 
@@ -86,25 +91,50 @@ describe('BaseAIProvider', () => {
       expect(provider.buildPromptCalls[0].previousError).toBeUndefined();
     });
 
-    it('should fall back to defaults when AI returns valid but empty fields', async () => {
-      const aiResponse = {
-        name: 'AI Name',
-        contact: { email: 'ai@example.com' },
-        summary: 'Tailored summary from AI',
-        experience: [],
+    it('should assemble immutable profile facts with AI-tailored narrative content', async () => {
+      const provider = new TestProvider(['raw'], [{
+        name: 'Invented Name',
+        contact: { email: 'invented@example.com' },
+        summary: 'Tailored summary for the vacancy',
+        experience: [
+          {
+            profile_index: 0,
+            description: 'Tailored description for the first role',
+            title: 'Invented Title',
+            company: 'Invented Company',
+            start_date: '1900',
+            end_date: '1901',
+          },
+        ],
         education: [],
         skills: [],
         languages: [],
-      };
-      const provider = new TestProvider(['raw'], [aiResponse]);
+      }]);
 
       const result = await provider.generateCV(profile, 'vacancy', 'es');
 
-      expect(result.name).toBe('AI Name');
-      expect(result.contact.email).toBe('ai@example.com');
+      expect(result.name).toBe(profile.name);
+      expect(result.contact).toEqual(profile.contact);
+      expect(result.experience).toEqual([
+        { ...profile.experience[0], description: 'Tailored description for the first role' },
+        profile.experience[1],
+      ]);
+      expect(result.education).toEqual(profile.education);
+      expect(result.skills).toEqual(profile.skills);
+      expect(result.languages).toEqual(profile.languages);
+      expect(result.summary).toBe('Tailored summary for the vacancy');
+    });
+
+    it('should preserve profile descriptions not tailored by AI', async () => {
+      const provider = new TestProvider(['raw'], [{ summary: 'Tailored summary from AI', experience: [] }]);
+
+      const result = await provider.generateCV(profile, 'vacancy', 'es');
+
+      expect(result.name).toBe(profile.name);
+      expect(result.contact).toEqual(profile.contact);
       expect(result.summary).toBe('Tailored summary from AI');
-      expect(result.experience).toEqual([]);
-      expect(result.skills).toEqual([]);
+      expect(result.experience).toEqual(profile.experience);
+      expect(result.skills).toEqual(profile.skills);
       expect(provider.callAPICalls).toHaveLength(1);
     });
   });
@@ -112,9 +142,7 @@ describe('BaseAIProvider', () => {
   describe('retry behavior', () => {
     it('should retry once when first attempt fails Zod validation', async () => {
       const invalid = { name: '' };
-      const valid = createMockCVData();
-      const { generated_at, ...validAI } = valid;
-      const provider = new TestProvider(['raw1', 'raw2'], [invalid, validAI]);
+      const provider = new TestProvider(['raw1', 'raw2'], [invalid, createAIResponse()]);
 
       const result = await provider.generateCV(profile, 'vacancy', 'es');
 
@@ -123,14 +151,12 @@ describe('BaseAIProvider', () => {
       expect(provider.buildPromptCalls).toHaveLength(2);
       expect(provider.buildPromptCalls[0].previousError).toBeUndefined();
       expect(provider.buildPromptCalls[1].previousError).toBeDefined();
-      expect(provider.buildPromptCalls[1].previousError).toContain('path name');
+      expect(provider.buildPromptCalls[1].previousError).toContain('path summary');
     });
 
     it('should inject the previous error in the second prompt', async () => {
       const invalid = { name: '' };
-      const valid = createMockCVData();
-      const { generated_at, ...validAI } = valid;
-      const provider = new TestProvider(['raw1', 'raw2'], [invalid, validAI]);
+      const provider = new TestProvider(['raw1', 'raw2'], [invalid, createAIResponse()]);
 
       await provider.generateCV(profile, 'vacancy', 'es');
 
@@ -174,16 +200,14 @@ describe('BaseAIProvider', () => {
         expect.fail('should have thrown');
       } catch (err) {
         expect((err as DomainError).suggestion).toBeDefined();
-        expect((err as DomainError).suggestion).toContain('path name');
+        expect((err as DomainError).suggestion).toContain('path summary');
       }
     });
   });
 
   describe('prompt options', () => {
     it('should inject a fresh currentDate on each attempt (no caching)', async () => {
-      const valid = createMockCVData();
-      const { generated_at, ...validAI } = valid;
-      const provider = new TestProvider(['raw1', 'raw2'], [{ name: '' }, validAI]);
+      const provider = new TestProvider(['raw1', 'raw2'], [{ name: '' }, createAIResponse()]);
 
       vi.setSystemTime(new Date('2026-06-16T00:00:00.000Z'));
       const promise = provider.generateCV(profile, 'vacancy', 'es');
@@ -198,9 +222,7 @@ describe('BaseAIProvider', () => {
 
     it('should pass currentDate matching runtime date in single-attempt success', async () => {
       vi.setSystemTime(new Date('2025-11-30T08:00:00.000Z'));
-      const valid = createMockCVData();
-      const { generated_at, ...validAI } = valid;
-      const provider = new TestProvider(['raw'], [validAI]);
+      const provider = new TestProvider(['raw'], [createAIResponse()]);
 
       await provider.generateCV(profile, 'vacancy', 'es');
 
@@ -210,9 +232,7 @@ describe('BaseAIProvider', () => {
 
   describe('malformed JSON', () => {
     it('should treat parse failure (non-object) as a Zod failure and retry', async () => {
-      const valid = createMockCVData();
-      const { generated_at, ...validAI } = valid;
-      const provider = new TestProvider(['raw1', 'raw2'], [42, validAI]);
+      const provider = new TestProvider(['raw1', 'raw2'], [42, createAIResponse()]);
 
       const result = await provider.generateCV(profile, 'vacancy', 'es');
 

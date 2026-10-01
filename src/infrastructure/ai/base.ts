@@ -12,7 +12,7 @@ export abstract class BaseAIProvider implements IAIProvider {
   abstract getModel(): string;
   abstract getEndpoint(): string;
   protected abstract buildPrompt(profile: Profile, vacancy: string, language: Language, options: PromptOptions): string;
-  protected abstract parseResponse(content: string): Partial<CVData>;
+  protected abstract parseResponse(content: string): unknown;
 
   async generateCV(profile: Profile, vacancy: string, language: Language): Promise<CVData> {
     const promptBuilder = new PromptBuilder();
@@ -43,14 +43,21 @@ export abstract class BaseAIProvider implements IAIProvider {
   }
 
   private complete(cvData: AIResponse, profile: Profile): CVData {
+    const descriptions = new Map(
+      cvData.experience.map(experience => [experience.profile_index, experience.description])
+    );
+
     return {
-      name: cvData.name || profile.name,
-      contact: cvData.contact || profile.contact,
-      summary: cvData.summary || '',
-      experience: cvData.experience || [],
-      education: cvData.education || [],
-      skills: cvData.skills || [],
-      languages: cvData.languages || [],
+      name: profile.name,
+      contact: profile.contact,
+      summary: cvData.summary,
+      experience: profile.experience.map((experience, index) => ({
+        ...experience,
+        description: descriptions.get(index) ?? experience.description,
+      })),
+      education: profile.education,
+      skills: profile.skills,
+      languages: profile.languages,
       generated_at: new Date().toISOString(),
     };
   }
