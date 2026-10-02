@@ -46,7 +46,7 @@ Preserve company and title fields when an experience entry presents them on the 
 
 - Isolated worktree and feature branch are ready from current `master`.
 - Task 1 is complete through RED/GREEN/REFACTOR.
-- Task 2 is verified and pending its single work-unit commit.
+- Task 2 is complete: the verified work unit was committed and merged.
 
 ## Evidence
 
@@ -59,8 +59,10 @@ Preserve company and title fields when an experience entry presents them on the 
 - Diff check: `git diff --check` passed.
 - Scope result: committed files are limited to this tracker, `src/infrastructure/parsers/PDFParser.ts`, and `tests/unit/infrastructure/parsers/PDFParser.test.ts`; package metadata, lockfile, dependencies, `.atl/`, remotes, and parent-worktree files are unchanged.
 - RDD state: disabled/unmanaged; no review was requested or started.
-- Commit identity: recorded in the final delivery because a Git commit cannot embed its own final object ID in its tracked content.
+- Feature commit: `208819059d411ff16aefebebc537e4e8f871dcf4` (`fix(parser): preserve company and title before standalone dates`).
+- Merge evidence: PR #6 merged through `11770e633a2d36d2c82e71b2fc87ff93588478ec` (`Merge pull request #6 from KenaiiDev/fix/p0-parser-experience-layout`); both commits are ancestors of `master`.
+- Historical audit: the stale pending commit entry is resolved by the merged work-unit and PR #6 evidence.
 
 ## Next Step
 
-Create the single Conventional Commit containing the repair, regression test, and tracker.
+No further action. The parser repair is merged through PR #6.

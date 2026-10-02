@@ -31,10 +31,10 @@ The user explicitly authorized one direct push of this bootstrap work unit to `g
 - [x] Create this tracker before writing the Issue Form.
 - [x] Mirror this tracker in Engram and read both copies back.
 - [x] Add and locally validate the YAML Issue Form.
-- [ ] Commit only the tracker and form with a Conventional Commit.
-- [ ] Push the exact commit once to `origin master`.
-- [ ] Verify the exact remote commit and form path through the GitHub API.
-- [ ] Update this tracker and its Engram mirror with final evidence.
+- [x] Commit only the tracker and form with a Conventional Commit.
+- [x] Push the exact commit once to `origin master`.
+- [x] Verify the exact remote commit and form path through the GitHub API.
+- [x] Update this tracker and its Engram mirror with final evidence.
 
 ## Route and Trigger
 
@@ -46,6 +46,9 @@ GitHub repository issue creation routes contributors to the new Change or Bug Re
 - Baseline: `origin/master` contains `.github/workflows/` but no `.github/ISSUE_TEMPLATE/` or tracked `odd/` paths.
 - Isolation: detached worktree created at `.worktrees/issue-intake` from the baseline commit; the primary worktree remains on `fix/p0-safe-profile-updates` with its pre-existing untracked `.atl/` directory untouched.
 - Local validation: `python3 -c '<Issue Form schema assertions>'` printed `YAML and required Issue Form controls: valid`; `git diff --check` passed.
+- Delivery: `0547fdf86ec5611cf4392a538076f2940941b674` (`chore(github): add structured issue intake form`) committed this tracker with `.github/ISSUE_TEMPLATE/change-or-bug.yml`.
+- Delivery: the form workflow is present on `master`; it supplies required request type, problem or desired outcome, rationale or reproduction and impact, scope and acceptance criteria, and acknowledgement inputs.
+- Historical audit: the originally authorized push and remote-path verification are complete; this maintenance record corrects the four stale checklist entries without changing the delivered workflow.
 
 ## Rollback
 
@@ -53,4 +56,4 @@ Revert the single bootstrap commit on `master`; this removes only the Issue Form
 
 ## Next Step
 
-Commit the tracker and validated Issue Form, then push the resulting commit once to `origin master`.
+No further action. The Issue Form workflow was delivered and its historical checklist is complete.
