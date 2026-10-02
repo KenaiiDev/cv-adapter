@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+const NonBlankTextSchema = z.string().refine(value => value.trim().length > 0, {
+  message: 'Text must not be empty or whitespace-only',
+});
+
 export interface AIResponse {
   summary: string;
   experience: Array<{
@@ -9,11 +13,11 @@ export interface AIResponse {
 }
 
 export const CVDataSchema = z.object({
-  summary: z.string(),
+  summary: NonBlankTextSchema,
   experience: z.array(
     z.object({
       profile_index: z.number().int().nonnegative(),
-      description: z.string(),
+      description: NonBlankTextSchema,
     })
   ),
 }) satisfies z.ZodType<AIResponse>;

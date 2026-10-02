@@ -35,6 +35,21 @@ describe('CVDataSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it.each(['', '   '])('should reject an empty or whitespace-only summary', summary => {
+    const result = CVDataSchema.safeParse({ summary, experience: [] });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(['', '   '])('should reject an empty or whitespace-only experience description', description => {
+    const result = CVDataSchema.safeParse({
+      summary: 'Tailored summary',
+      experience: [{ profile_index: 0, description }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('should reject a fractional profile experience index', () => {
     const result = CVDataSchema.safeParse({
       summary: 'Tailored summary',

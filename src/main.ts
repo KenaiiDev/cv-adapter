@@ -2,11 +2,60 @@
 
 import { Command } from 'commander';
 import inquirer from 'inquirer';
+import * as dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { initCommand } from './application/commands/InitCommand.js';
 import { updateCommand } from './application/commands/UpdateCommand.js';
-import { generateCommand } from './application/commands/GenerateCommand.js';
+import { GenerateCommand } from './application/commands/GenerateCommand.js';
 import { showProfileCommand, editProfileCommand } from './application/commands/ProfileCommand.js';
+import { DomainError } from './domain/errors/DomainError.js';
+import { GroqAI } from './infrastructure/ai/GroqAI.js';
+import { GeminiAI } from './infrastructure/ai/GeminiAI.js';
+import { OpenAIProvider } from './infrastructure/ai/OpenAI.js';
+import { AnthropicAI } from './infrastructure/ai/AnthropicAI.js';
+import { OllamaAI } from './infrastructure/ai/OllamaAI.js';
+import { InquirerGeneratedCVReview } from './infrastructure/confirmation/InquirerGeneratedCVReview.js';
+import { NodeFileWriter } from './infrastructure/files/NodeFileWriter.js';
+import { PDFGenerator } from './infrastructure/pdf/PDFGenerator.js';
+import { ReadlineGeneratePrompts } from './infrastructure/prompts/ReadlineGeneratePrompts.js';
+import { JSONProfileRepository } from './infrastructure/repositories/JSONProfileRepository.js';
+import type { IAIProvider } from './interfaces/IAIProvider.js';
+
+dotenv.config();
+
+function createAIProviderFactory(): () => IAIProvider {
+  return () => {
+    const provider = process.env.ACTIVE_PROVIDER || 'groq';
+
+    switch (provider) {
+      case 'groq':
+        return new GroqAI();
+      case 'gemini':
+        return new GeminiAI();
+      case 'openai':
+        return new OpenAIProvider();
+      case 'anthropic':
+        return new AnthropicAI();
+      case 'ollama':
+        return new OllamaAI();
+      default:
+        throw new DomainError(
+          `Unknown provider: ${provider}`,
+          'AI_ERROR',
+          'Set ACTIVE_PROVIDER to: groq, gemini, openai, anthropic, or ollama',
+        );
+    }
+  };
+}
+
+const generateCommand = new GenerateCommand(
+  new JSONProfileRepository(),
+  createAIProviderFactory(),
+  new InquirerGeneratedCVReview(),
+  new ReadlineGeneratePrompts(),
+  new PDFGenerator(),
+  new NodeFileWriter(),
+);
 
 const program = new Command();
 const { version } = JSON.parse(
